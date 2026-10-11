@@ -31,6 +31,8 @@ final class AppModel: ObservableObject {
     private var tools: MediaTools?
     private var job: Task<Void, Never>?
     private var timeObserver: Any?
+    /// The file the player is using: the original, or a converted copy in the work folder.
+    private var playbackURL: URL?
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "whisperModel")
@@ -95,6 +97,34 @@ final class AppModel: ObservableObject {
         job = Task { await transcribe(url, skipCache: true) }
     }
 
+    // MARK: - Converted copies
+
+    var isBusy: Bool {
+        if case .working = status { return true }
+        return false
+    }
+
+    /// Converted copies that can be deleted (everything in the work folder except what is playing).
+    private func removableCopies() -> [URL] {
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: AppFolders.work, includingPropertiesForKeys: [.fileSizeKey])) ?? []
+        return files.filter { $0.standardizedFileURL != playbackURL?.standardizedFileURL }
+    }
+
+    /// Total size in bytes of the copies `clearConvertedCopies()` would delete.
+    func convertedCopiesSize() -> Int64 {
+        removableCopies().reduce(0) { total, url in
+            total + Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+    }
+
+    /// Deletes converted copies. Originals and transcripts are kept; a copy is
+    /// recreated automatically the next time its original is opened.
+    func clearConvertedCopies() {
+        guard !isBusy else { return }
+        removableCopies().forEach { try? FileManager.default.removeItem(at: $0) }
+    }
+
     func cancel() {
         tools?.cancel()
         job?.cancel()
@@ -127,6 +157,7 @@ final class AppModel: ObservableObject {
             }
             let videoTracks = (try? await AVURLAsset(url: playableURL).loadTracks(withMediaType: .video)) ?? []
             hasVideo = !videoTracks.isEmpty
+            playbackURL = playableURL
             setUpPlayer(AVPlayer(url: playableURL))
         } catch {
             report(error)
@@ -219,6 +250,7 @@ final class AppModel: ObservableObject {
         timeObserver = nil
         player?.pause()
         player = nil
+        playbackURL = nil
         activeLine = nil
         activeWord = nil
     }

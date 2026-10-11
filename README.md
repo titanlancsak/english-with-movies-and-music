@@ -31,6 +31,7 @@ SwiftUI: player em cima e legenda interativa embaixo
 | Dicionário | Dicionário do macOS (offline) e [Free Dictionary API](https://dictionaryapi.dev) como reserva |
 | Pronúncia | `AVSpeechSynthesizer` (vozes do sistema) |
 | Cache | Cada arquivo é transcrito uma vez, em `~/Library/Application Support/EnglishWithMovies` |
+| Cópias convertidas | Vídeos .mkv, VP9 ou AV1 viram cópias em H.264 na pasta `work`. O botão **Limpar cópias** (🗑) apaga essas cópias, menos a que está tocando. |
 
 ## Requisitos
 

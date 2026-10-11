@@ -6,6 +6,7 @@ struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @ViewState private var isDropTargeted = false
     @ViewState private var showLinkSheet = false
+    @ViewState private var cleanupSize: Int64?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,9 +45,31 @@ struct ContentView: View {
                     .help("Baixar um vídeo a partir de um link do YouTube")
                 Button("Importar legenda", systemImage: "captions.bubble") { FilePicker.openSubtitles(model) }
                 Button("Abrir", systemImage: "folder") { FilePicker.openMedia(model) }
+                Button("Limpar cópias", systemImage: "trash") { cleanupSize = model.convertedCopiesSize() }
+                    .help("Apagar as cópias convertidas para liberar espaço")
+                    .disabled(model.isBusy)
             }
         }
+        .confirmationDialog(
+            cleanupTitle,
+            isPresented: Binding(get: { cleanupSize != nil }, set: { if !$0 { cleanupSize = nil } })
+        ) {
+            if cleanupSize ?? 0 > 0 {
+                Button("Apagar", role: .destructive) { model.clearConvertedCopies() }
+            } else {
+                Button("OK") {}
+            }
+        } message: {
+            Text(cleanupSize ?? 0 > 0
+                ? "Os arquivos originais e as transcrições são mantidos. Se você abrir o vídeo de novo, o app converte outra vez."
+                : "As cópias convertidas aparecem aqui quando o app converte vídeos .mkv, VP9 ou AV1.")
+        }
         .navigationTitle(model.mediaURL?.lastPathComponent ?? "English with Movies & Music")
+    }
+
+    private var cleanupTitle: String {
+        guard let size = cleanupSize, size > 0 else { return "Não há cópias para apagar" }
+        return "Apagar cópias convertidas (\(ByteCountFormatter.string(fromByteCount: size, countStyle: .file)))?"
     }
 }
 
