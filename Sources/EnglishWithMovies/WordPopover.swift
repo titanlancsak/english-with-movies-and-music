@@ -7,12 +7,14 @@ import SwiftUI
 struct WordPopover: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var savedWords: SavedWordsStore
+    @EnvironmentObject private var translator: Translator
     let word: String
     /// The subtitle line where the word was clicked (saved as context).
     let line: TranscriptLine
 
     @ViewState private var entry: DictionaryEntry?
     @ViewState private var isLoading = true
+    @ViewState private var wordTranslation: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -26,6 +28,7 @@ struct WordPopover: View {
                 Text("Não encontrei esta palavra no dicionário.")
                     .foregroundStyle(.secondary)
             }
+            portuguese
             examples
         }
         .padding(16)
@@ -71,6 +74,7 @@ struct WordPopover: View {
             phonetic: entry?.phonetic,
             partOfSpeech: sense?.partOfSpeech,
             definition: sense?.definition,
+            translation: wordTranslation,
             context: line.text,
             sourcePath: model.mediaURL?.path,
             sourceTime: line.start
@@ -122,6 +126,31 @@ struct WordPopover: View {
                 }
             }
             .font(.callout)
+        }
+    }
+
+    @ViewBuilder
+    private var portuguese: some View {
+        if translator.isSupportedOS {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Em português").font(.headline)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(WordNormalizer.lookupKey(word)).foregroundStyle(.secondary)
+                    Image(systemName: "arrow.right").font(.caption).foregroundStyle(.secondary)
+                    Text(wordTranslation ?? "traduzindo…").bold()
+                }
+                Label {
+                    TranslatedText(text: line.text).fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "character.bubble")
+                }
+                .font(.callout)
+                if let problem = translator.problem {
+                    Text(problem).font(.caption).foregroundStyle(.orange)
+                }
+            }
+            .textSelection(.enabled)
+            .task { wordTranslation = await translator.translate(WordNormalizer.lookupKey(word)) }
         }
     }
 

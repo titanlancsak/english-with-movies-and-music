@@ -5,7 +5,8 @@ Aplicativo de macOS para aprender inglês com filmes e músicas.
 - **Arraste um filme ou uma música** para a janela. O app transcreve todas as falas no seu Mac, sem internet e sem custo.
 - **A legenda aparece abaixo do vídeo**: a fala atual fica em **negrito** e a palavra que está sendo dita é destacada em tempo real.
 - **Clique em qualquer palavra** para ver o significado no dicionário, a pronúncia e até **3 exemplos de frases**. Quando o dicionário tem menos de 3 exemplos, o app completa com falas do próprio filme ou da própria música.
-- **Salve palavras** (🔖 no popup) para revisar depois. A lista guarda o significado, a frase em que a palavra apareceu e o filme. Ela também volta direto para o trecho e exporta **CSV** para o Anki (⇧⌘S abre a lista).
+- **Tradução para português**: o botão "Tradução" mostra a tradução embaixo de cada fala, e o popup da palavra traduz a palavra e a frase. Tudo roda no próprio Mac, sem internet depois do primeiro download do idioma.
+- **Salve palavras** (🔖 no popup) para revisar depois. A lista guarda o significado, a frase em que a palavra apareceu e o filme. Ela também volta direto para o trecho e exporta **CSV** (com a tradução) para o Anki (⇧⌘S abre a lista).
 - Clique no horário de uma fala para pular até ela.
 - **Baixe vídeos do YouTube** colando o link. Eles são salvos em `~/Movies/English with Movies`.
 - Já tem a legenda? Importe um `.srt` e a transcrição é pulada.
@@ -30,6 +31,7 @@ SwiftUI: player em cima e legenda interativa embaixo
 | Download | [yt-dlp](https://github.com/yt-dlp/yt-dlp) (prefere H.264 até 1080p) |
 | Transcrição | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) com aceleração Metal |
 | Dicionário | Dicionário do macOS (offline) e [Free Dictionary API](https://dictionaryapi.dev) como reserva |
+| Tradução | Framework Translation da Apple (macOS 15+, offline) |
 | Pronúncia | `AVSpeechSynthesizer` (vozes do sistema) |
 | Cache | Cada arquivo é transcrito uma vez, em `~/Library/Application Support/EnglishWithMovies` |
 | Cópias convertidas | Vídeos .mkv, VP9 ou AV1 viram cópias em H.264 na pasta `work`. O botão **Limpar cópias** (🗑) apaga essas cópias, menos a que está tocando. |

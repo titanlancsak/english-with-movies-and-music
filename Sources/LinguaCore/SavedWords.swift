@@ -9,6 +9,8 @@ public struct SavedWord: Codable, Hashable, Identifiable, Sendable {
     public var phonetic: String?
     public var partOfSpeech: String?
     public var definition: String?
+    /// Portuguese translation of the word.
+    public var translation: String?
     /// The subtitle line where the word was clicked.
     public var context: String?
     public var sourcePath: String?
@@ -16,12 +18,13 @@ public struct SavedWord: Codable, Hashable, Identifiable, Sendable {
     public var dateAdded: Date
 
     public init(word: String, phonetic: String? = nil, partOfSpeech: String? = nil, definition: String? = nil,
-                context: String? = nil, sourcePath: String? = nil, sourceTime: Double? = nil, dateAdded: Date = Date()) {
+                translation: String? = nil, context: String? = nil, sourcePath: String? = nil, sourceTime: Double? = nil, dateAdded: Date = Date()) {
         self.key = WordNormalizer.lookupKey(word)
         self.word = word
         self.phonetic = phonetic
         self.partOfSpeech = partOfSpeech
         self.definition = definition
+        self.translation = translation
         self.context = context
         self.sourcePath = sourcePath
         self.sourceTime = sourceTime
@@ -66,15 +69,16 @@ public struct WordList: Codable, Hashable, Sendable {
         return words.filter {
             $0.word.localizedCaseInsensitiveContains(query)
                 || ($0.definition ?? "").localizedCaseInsensitiveContains(query)
+                || ($0.translation ?? "").localizedCaseInsensitiveContains(query)
                 || ($0.context ?? "").localizedCaseInsensitiveContains(query)
         }
     }
 
     /// CSV for spreadsheets or flashcard apps such as Anki.
     public func csv() -> String {
-        let header = ["word", "phonetic", "part of speech", "definition", "sentence", "source"]
+        let header = ["word", "portuguese", "phonetic", "part of speech", "definition", "sentence", "source"]
         let rows = words.map { word in
-            [word.word, word.phonetic, word.partOfSpeech, word.definition, word.context, word.sourceName]
+            [word.word, word.translation, word.phonetic, word.partOfSpeech, word.definition, word.context, word.sourceName]
                 .map { Self.csvField($0 ?? "") }
                 .joined(separator: ",")
         }

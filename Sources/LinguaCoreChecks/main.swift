@@ -117,8 +117,11 @@ check(list.filtered(by: "thunder").map(\.key) == ["storm"], "saved words: search
 list.remove("Storm")
 check(list.words.count == 1, "saved words: remove")
 check(SavedWord(word: "x", sourcePath: "/Movies/Tears of Steel.mp4").sourceName == "Tears of Steel", "saved words: source name")
-let csv = WordList(words: [SavedWord(word: "storm", definition: "wind, \"rain\"")]).csv()
-check(csv == "word,phonetic,part of speech,definition,sentence,source\nstorm,,,\"wind, \"\"rain\"\"\",,\n", "saved words: CSV quoting")
+let csv = WordList(words: [SavedWord(word: "storm", definition: "wind, \"rain\"", translation: "tempestade")]).csv()
+check(csv == "word,portuguese,phonetic,part of speech,definition,sentence,source\nstorm,tempestade,,,\"wind, \"\"rain\"\"\",,\n", "saved words: CSV quoting and translation")
+check(WordList(words: [SavedWord(word: "storm", translation: "tempestade")]).filtered(by: "tempest").count == 1, "saved words: search in translation")
+let oldFormat = #"{"words":[{"key":"robot","word":"robot","dateAdded":0}]}"#
+check((try? JSONDecoder().decode(WordList.self, from: Data(oldFormat.utf8)))?.words.first?.translation == nil, "saved words: lists saved before translations still load")
 
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
 exit(failures == 0 ? 0 : 1)

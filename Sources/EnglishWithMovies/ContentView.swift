@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var savedWords: SavedWordsStore
+    @EnvironmentObject private var translator: Translator
     @Environment(\.openWindow) private var openWindow
     @ViewState private var isDropTargeted = false
     @ViewState private var showLinkSheet = false
@@ -13,6 +14,12 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             StatusBar()
+            if translator.showLineTranslations, let problem = translator.problem {
+                Label(problem, systemImage: "character.bubble")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(.bar)
+            }
             if model.mediaURL == nil {
                 DropZone(isTargeted: isDropTargeted, showLinkSheet: $showLinkSheet)
             } else {
@@ -46,6 +53,9 @@ struct ContentView: View {
                 Button("Baixar do YouTube", systemImage: "link") { showLinkSheet = true }
                     .help("Baixar um vídeo a partir de um link do YouTube")
                 Button("Importar legenda", systemImage: "captions.bubble") { FilePicker.openSubtitles(model) }
+                Toggle("Tradução", systemImage: "character.bubble", isOn: $translator.showLineTranslations)
+                    .help("Mostrar a tradução em português embaixo de cada fala")
+                    .disabled(!translator.isSupportedOS)
                 Button("Abrir", systemImage: "folder") { FilePicker.openMedia(model) }
                 Button("Palavras salvas (\(savedWords.list.words.count))", systemImage: "bookmark") {
                     openWindow(id: "saved-words")

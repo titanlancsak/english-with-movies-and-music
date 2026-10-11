@@ -34,7 +34,7 @@ struct SavedWordsView: View {
                 }
             }
         }
-        .searchable(text: $query, prompt: "Buscar palavra, significado ou frase")
+        .searchable(text: $query, prompt: "Buscar palavra, tradução, significado ou frase")
         .toolbar {
             ToolbarItem {
                 Text("\(store.list.words.count) palavra\(store.list.words.count == 1 ? "" : "s")")
@@ -78,6 +78,9 @@ private struct SavedWordRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(word.word).font(.title3.bold())
+                if let translation = word.translation {
+                    Text("· \(translation)").font(.title3)
+                }
                 if let phonetic = word.phonetic {
                     Text(phonetic).foregroundStyle(.secondary)
                 }

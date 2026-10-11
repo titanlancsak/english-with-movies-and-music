@@ -6,12 +6,15 @@ struct EnglishWithMoviesApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @StateObject private var model = AppModel()
     @StateObject private var savedWords = SavedWordsStore()
+    @StateObject private var translator = Translator()
 
     var body: some Scene {
         WindowGroup("English with Movies & Music") {
             ContentView()
                 .environmentObject(model)
                 .environmentObject(savedWords)
+                .environmentObject(translator)
+                .modifier(TranslationHost(translator: translator))
                 .frame(minWidth: 820, minHeight: 620)
                 .onAppear { delegate.model = model }
         }
@@ -35,6 +38,7 @@ struct EnglishWithMoviesApp: App {
             SavedWordsView()
                 .environmentObject(model)
                 .environmentObject(savedWords)
+                .environmentObject(translator)
         }
         .defaultSize(width: 560, height: 640)
     }

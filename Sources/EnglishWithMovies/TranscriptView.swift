@@ -60,6 +60,7 @@ struct TranscriptView: View {
 
 private struct LineRow: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var translator: Translator
     let line: TranscriptLine
     let isActive: Bool
     let activeWord: Int?
@@ -73,15 +74,24 @@ private struct LineRow: View {
                 .help("Ir para esta fala")
                 .frame(width: 56, alignment: .trailing)
 
-            FlowLayout(spacing: 5, lineSpacing: 4) {
-                ForEach(Array(line.words.enumerated()), id: \.offset) { index, word in
-                    WordButton(
-                        word: word,
-                        line: line,
-                        isLineActive: isActive,
-                        isSpoken: isActive && (activeWord.map { index <= $0 } ?? false),
-                        isCurrent: isActive && activeWord == index
-                    )
+            VStack(alignment: .leading, spacing: 4) {
+                FlowLayout(spacing: 5, lineSpacing: 4) {
+                    ForEach(Array(line.words.enumerated()), id: \.offset) { index, word in
+                        WordButton(
+                            word: word,
+                            line: line,
+                            isLineActive: isActive,
+                            isSpoken: isActive && (activeWord.map { index <= $0 } ?? false),
+                            isCurrent: isActive && activeWord == index
+                        )
+                    }
+                }
+                if translator.showLineTranslations {
+                    TranslatedText(text: line.text)
+                        .font(.system(size: isActive ? 16 : 14))
+                        .italic()
+                        .foregroundStyle(isActive ? Color.primary.opacity(0.75) : Color.secondary.opacity(0.8))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -104,6 +114,7 @@ private struct LineRow: View {
 private struct WordButton: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var savedWords: SavedWordsStore
+    @EnvironmentObject private var translator: Translator
     @ViewState private var showDefinition = false
     let word: TimedWord
     let line: TranscriptLine
@@ -134,6 +145,7 @@ private struct WordButton: View {
                 WordPopover(word: word.text, line: line)
                     .environmentObject(model)
                     .environmentObject(savedWords)
+                    .environmentObject(translator)
             }
     }
 
