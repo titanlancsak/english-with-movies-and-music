@@ -1,0 +1,126 @@
+import AVFoundation
+import CoreServices
+import LinguaCore
+import SwiftUI
+
+/// Definition card shown when a word is clicked.
+struct WordPopover: View {
+    @EnvironmentObject private var model: AppModel
+    let word: String
+
+    @ViewState private var entry: DictionaryEntry?
+    @ViewState private var isLoading = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            Divider()
+            if isLoading {
+                ProgressView().frame(maxWidth: .infinity)
+            } else if let entry {
+                senses(entry)
+            } else {
+                Text("Não encontrei esta palavra no dicionário.")
+                    .foregroundStyle(.secondary)
+            }
+            examples
+        }
+        .padding(16)
+        .frame(width: 380)
+        .task { await load() }
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(entry?.word ?? WordNormalizer.lookupKey(word))
+                .font(.title2.bold())
+            if let phonetic = entry?.phonetic {
+                Text(phonetic).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                Pronouncer.shared.say(entry?.word ?? WordNormalizer.lookupKey(word))
+            } label: {
+                Image(systemName: "speaker.wave.2.fill")
+            }
+            .buttonStyle(.borderless)
+            .help("Ouvir a pronúncia")
+        }
+    }
+
+    private func senses(_ entry: DictionaryEntry) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(entry.senses.enumerated()), id: \.offset) { _, sense in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(sense.partOfSpeech)
+                        .font(.caption.italic())
+                        .foregroundStyle(.secondary)
+                    Text(sense.definition)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .textSelection(.enabled)
+    }
+
+    /// Up to 3 examples: dictionary examples first, then lines from this movie/song.
+    @ViewBuilder
+    private var examples: some View {
+        let fromDictionary = Array((entry?.examples ?? []).prefix(DictionaryService.maxExamples))
+        let remaining = DictionaryService.maxExamples - fromDictionary.count
+        let fromMedia = remaining > 0
+            ? (model.transcript?.lines(containing: word, limit: remaining) ?? [])
+            : []
+
+        if !isLoading, !fromDictionary.isEmpty || !fromMedia.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Exemplos").font(.headline)
+                ForEach(fromDictionary, id: \.self) { example in
+                    Label(example, systemImage: "text.quote")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(fromMedia) { line in
+                    Button {
+                        model.seek(to: line.start)
+                        model.player?.play()
+                    } label: {
+                        Label(line.text, systemImage: model.hasVideo ? "film" : "music.note")
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Ouvir este trecho")
+                }
+            }
+            .font(.callout)
+        }
+    }
+
+    private func load() async {
+        defer { isLoading = false }
+        entry = try? await model.dictionary.lookup(word)
+    }
+}
+
+/// The dictionary built into macOS (works offline).
+enum SystemDictionary {
+    static func define(_ word: String) -> String? {
+        guard !word.isEmpty else { return nil }
+        let range = CFRange(location: 0, length: (word as NSString).length)
+        return DCSCopyTextDefinition(nil, word as CFString, range)?.takeRetainedValue() as String?
+    }
+}
+
+@MainActor
+final class Pronouncer {
+    static let shared = Pronouncer()
+    private let synthesizer = AVSpeechSynthesizer()
+
+    func say(_ text: String) {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        utterance.rate = 0.42
+        synthesizer.stopSpeaking(at: .immediate)
+        synthesizer.speak(utterance)
+    }
+}
