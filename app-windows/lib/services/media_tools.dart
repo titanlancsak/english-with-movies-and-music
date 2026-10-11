@@ -135,12 +135,12 @@ class MediaTools {
     unawaited(process.stdin.close());
     _running = process;
     log('Executando $tool');
-    final log = StringBuffer();
+    final output = StringBuffer();
     StreamSubscription<String> listen(Stream<List<int>> stream) => stream
         .transform(const Utf8Decoder(allowMalformed: true))
         .transform(const LineSplitter())
         .listen((line) {
-          log.writeln(line);
+          output.writeln(line);
           onLine?.call(line);
         });
     final out = listen(process.stdout), err = listen(process.stderr);
@@ -150,7 +150,7 @@ class MediaTools {
     _running = null;
     if (_cancelled) throw CancelledException();
     if (code != 0) {
-      final text = log.toString();
+      final text = output.toString();
       throw ToolException('$tool falhou:\n${text.length > 600 ? text.substring(text.length - 600) : text}');
     }
   }
