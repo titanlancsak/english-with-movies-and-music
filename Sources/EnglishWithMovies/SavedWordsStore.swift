@@ -28,6 +28,12 @@ final class SavedWordsStore: ObservableObject {
         persist()
     }
 
+    /// Records a flashcard answer and schedules the next review.
+    func grade(_ word: String, _ grade: ReviewGrade) {
+        list.grade(word, grade)
+        persist()
+    }
+
     func remove(_ word: String) {
         list.remove(word)
         persist()

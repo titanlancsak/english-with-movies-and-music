@@ -5,6 +5,8 @@ import SwiftUI
 struct LibraryView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var library: LibraryStore
+    @EnvironmentObject private var savedWords: SavedWordsStore
+    @Environment(\.openWindow) private var openWindow
     @Binding var showLinkSheet: Bool
     @ViewState private var deleteCandidate: LibraryItem?
 
@@ -62,6 +64,14 @@ struct LibraryView: View {
         HStack(spacing: 12) {
             Button("Abrir arquivo…", systemImage: "folder") { FilePicker.openMedia(model) }
             Button("Baixar do YouTube…", systemImage: "link") { showLinkSheet = true }
+            let due = savedWords.list.due().count
+            if due > 0 {
+                Button("Revisar palavras (\(due))", systemImage: "rectangle.on.rectangle.angled") {
+                    openWindow(id: "review")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+            }
             Spacer()
             if library.downloadsSize > 0 {
                 Text("Downloads: \(ByteCountFormatter.string(fromByteCount: library.downloadsSize, countStyle: .file))")

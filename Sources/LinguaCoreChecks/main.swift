@@ -118,6 +118,7 @@ check(list.filtered(by: "thunder").map(\.key) == ["storm"], "saved words: search
 list.remove("Storm")
 check(list.words.count == 1, "saved words: remove")
 check(SavedWord(word: "x", sourcePath: "/Movies/Tears of Steel.mp4").sourceName == "Tears of Steel", "saved words: source name")
+check(SavedWord(word: "x", sourcePath: "/Movies/Tears of Steel [R6MlUcmOul8].mp4").sourceName == "Tears of Steel", "saved words: source name without video id")
 let csv = WordList(words: [SavedWord(word: "storm", definition: "wind, \"rain\"", translation: "tempestade")]).csv()
 check(csv == "word,portuguese,phonetic,part of speech,definition,sentence,source\nstorm,tempestade,,,\"wind, \"\"rain\"\"\",,\n", "saved words: CSV quoting and translation")
 check(WordList(words: [SavedWord(word: "storm", translation: "tempestade")]).filtered(by: "tempest").count == 1, "saved words: search in translation")
@@ -219,6 +220,38 @@ check(vowel.tips.first?.contains("i longo (sheep)") == true && vowel.tips.first?
 
 let withSounds = PronunciationScorer.score(target: line, spoken: spoken("We need to leave the harbor before sunset."), sounds: think)
 check(withSounds.score < perfect.score && withSounds.sounds != nil, "sounds: sound errors lower the score (\(withSounds.score))")
+
+// MARK: Review (spaced repetition)
+
+let day: TimeInterval = 86_400
+let start = Date(timeIntervalSince1970: 1_800_000_000)
+var state = ReviewScheduler.next(nil, grade: .good, now: start)
+check(state.interval == 1 && state.due == start.addingTimeInterval(day), "review: first 'good' -> 1 day")
+state = ReviewScheduler.next(state, grade: .good, now: state.due)
+check(state.interval == 3, "review: second 'good' -> 3 days")
+state = ReviewScheduler.next(state, grade: .good, now: state.due)
+check(state.interval == 8, "review: third 'good' -> 3 x 2.5 = 8 days")
+let forgotten = ReviewScheduler.next(state, grade: .again, now: state.due)
+check(forgotten.repetitions == 0 && forgotten.lapses == 1 && forgotten.ease < state.ease, "review: 'again' resets and lowers ease")
+check(forgotten.due.timeIntervalSince(state.due) == ReviewScheduler.relearnDelay, "review: 'again' comes back in 10 minutes")
+check(ReviewScheduler.next(nil, grade: .easy, now: start).interval == 4, "review: 'easy' on a new word -> 4 days")
+var hardState = ReviewState(due: start)
+for _ in 0..<12 { hardState = ReviewScheduler.next(hardState, grade: .hard, now: start) }
+check(hardState.ease == 1.3, "review: ease never drops below 1.3")
+check(ReviewScheduler.describeNext(nil, grade: .again, now: start) == "10 min"
+      && ReviewScheduler.describeNext(nil, grade: .good, now: start) == "1 dia"
+      && ReviewScheduler.describeNext(nil, grade: .easy, now: start) == "4 dias", "review: button labels")
+
+var deck = WordList()
+deck.add(SavedWord(word: "harbor"))
+deck.add(SavedWord(word: "storm"))
+check(deck.due(now: start).count == 2, "review: new words are due")
+deck.grade("storm", .good, now: start)
+check(deck.due(now: start).map(\.key) == ["harbor"], "review: reviewed word leaves the queue")
+check(deck.due(now: start.addingTimeInterval(day + 1)).count == 2, "review: and comes back when due")
+check(deck.nextDueDate(after: start) == start.addingTimeInterval(day), "review: next due date")
+deck.add(SavedWord(word: "storm", definition: "saved again"))
+check(deck.words.first?.review?.interval == 1, "review: saving a word again keeps its progress")
 
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
 exit(failures == 0 ? 0 : 1)

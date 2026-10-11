@@ -16,6 +16,8 @@ public struct SavedWord: Codable, Hashable, Identifiable, Sendable {
     public var sourcePath: String?
     public var sourceTime: Double?
     public var dateAdded: Date
+    /// Spaced-repetition state; nil until the first review.
+    public var review: ReviewState?
 
     public init(word: String, phonetic: String? = nil, partOfSpeech: String? = nil, definition: String? = nil,
                 translation: String? = nil, context: String? = nil, sourcePath: String? = nil, sourceTime: Double? = nil, dateAdded: Date = Date()) {
@@ -31,14 +33,18 @@ public struct SavedWord: Codable, Hashable, Identifiable, Sendable {
         self.dateAdded = dateAdded
     }
 
+    /// The file name without extension or a trailing video id such as " [R6MlUcmOul8]".
     public var sourceName: String? {
-        sourcePath.map { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent }
+        sourcePath.map {
+            URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent
+                .replacingOccurrences(of: #"\s*\[[A-Za-z0-9_-]{6,}\]$"#, with: "", options: .regularExpression)
+        }
     }
 }
 
 /// The saved words, newest first.
 public struct WordList: Codable, Hashable, Sendable {
-    public private(set) var words: [SavedWord] = []
+    public internal(set) var words: [SavedWord] = []
 
     public init(words: [SavedWord] = []) {
         self.words = words
@@ -51,9 +57,13 @@ public struct WordList: Codable, Hashable, Sendable {
         return words.contains { $0.key == key }
     }
 
-    /// Adds the word at the top; saving it again replaces the old entry.
+    /// Adds the word at the top; saving it again replaces the old entry but keeps its review progress.
     public mutating func add(_ word: SavedWord) {
         guard !word.key.isEmpty else { return }
+        var word = word
+        if word.review == nil, let existing = words.first(where: { $0.key == word.key }) {
+            word.review = existing.review
+        }
         remove(word.key)
         words.insert(word, at: 0)
     }

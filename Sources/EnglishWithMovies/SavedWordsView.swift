@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct SavedWordsView: View {
     @EnvironmentObject private var store: SavedWordsStore
     @EnvironmentObject private var model: AppModel
+    @Environment(\.openWindow) private var openWindow
     @ViewState private var query = ""
     @ViewState private var exportError: String?
 
@@ -39,6 +40,13 @@ struct SavedWordsView: View {
             ToolbarItem {
                 Text("\(store.list.words.count) palavra\(store.list.words.count == 1 ? "" : "s")")
                     .foregroundStyle(.secondary)
+            }
+            ToolbarItem {
+                Button("Revisar (\(store.list.due().count))", systemImage: "rectangle.on.rectangle.angled") {
+                    openWindow(id: "review")
+                }
+                .help("Revisar as palavras com cartões (⇧⌘R)")
+                .disabled(store.list.words.isEmpty)
             }
             ToolbarItem {
                 Button("Exportar CSV", systemImage: "square.and.arrow.up", action: export)
@@ -88,6 +96,7 @@ private struct SavedWordRow: View {
                     Text(partOfSpeech).font(.caption.italic()).foregroundStyle(.secondary)
                 }
                 Spacer()
+                ReviewStatus(review: word.review)
                 Button { Pronouncer.shared.say(word.word) } label: {
                     Image(systemName: "speaker.wave.2.fill")
                 }
@@ -127,5 +136,23 @@ private struct SavedWordRow: View {
         }
         .padding(.vertical, 6)
         .textSelection(.enabled)
+    }
+}
+
+/// "Revisar agora", "Revisão em 3 dias" or "Dominada".
+private struct ReviewStatus: View {
+    let review: ReviewState?
+
+    var body: some View {
+        Group {
+            if let review, review.isMastered {
+                Label("Dominada", systemImage: "checkmark.seal.fill").foregroundStyle(.green)
+            } else if let review, review.due > Date() {
+                Text("Revisão \(review.due.formatted(.relative(presentation: .named)))").foregroundStyle(.secondary)
+            } else {
+                Text("Revisar agora").foregroundStyle(.orange)
+            }
+        }
+        .font(.caption)
     }
 }

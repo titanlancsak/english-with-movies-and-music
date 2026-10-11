@@ -39,6 +39,7 @@ struct EnglishWithMoviesApp: App {
             }
             CommandGroup(after: .windowArrangement) {
                 OpenSavedWordsButton()
+                OpenReviewButton()
                 OpenPracticeHistoryButton()
             }
         }
@@ -50,6 +51,14 @@ struct EnglishWithMoviesApp: App {
                 .environmentObject(translator)
         }
         .defaultSize(width: 560, height: 640)
+
+        Window("Revisão de palavras", id: "review") {
+            ReviewView()
+                .environmentObject(model)
+                .environmentObject(savedWords)
+                .environmentObject(translator)
+        }
+        .defaultSize(width: 580, height: 640)
 
         Window("Histórico de pronúncia", id: "practice-history") {
             PracticeHistoryView()
@@ -114,6 +123,16 @@ private struct OpenSavedWordsButton: View {
     var body: some View {
         Button("Palavras salvas") { openWindow(id: "saved-words") }
             .keyboardShortcut("s", modifiers: [.command, .shift])
+    }
+}
+
+/// Menu item (⇧⌘R) that opens the flashcard review.
+private struct OpenReviewButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Revisar palavras") { openWindow(id: "review") }
+            .keyboardShortcut("r", modifiers: [.command, .shift])
     }
 }
 

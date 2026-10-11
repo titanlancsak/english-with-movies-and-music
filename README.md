@@ -13,6 +13,7 @@ Aplicativo de macOS para aprender inglês com filmes e músicas.
 - **Análise por som** (opcional): mostra exatamente qual som saiu errado (o “th” falado como /t/, o R americano, “ship” × “sheep”, um “i” a mais no final da palavra…), com dicas de como posicionar a língua e os lábios.
 - **Salve palavras** (🔖 no popup) para revisar depois. A lista guarda o significado, a frase em que a palavra apareceu e o filme. Ela também volta direto para o trecho e exporta **CSV** (com a tradução) para o Anki (⇧⌘S abre a lista).
 - Descrições de som como `[Music]`, `(background music playing)` e `♪` são removidas da legenda.
+- **Revise as palavras salvas** com cartões (⇧⌘R) e repetição espaçada, como no Anki: quem você acerta volta em 1, 3, 8 dias…; quem você erra volta em 10 minutos. Três modos: Inglês → Português, Português → Inglês e Ouvir.
 - Clique no horário de uma fala para pular até ela.
 - **Baixe vídeos do YouTube** colando o link. Eles ficam na biblioteca (pasta `~/Movies/English with Movies`); passe o mouse na capa e clique na 🗑 para apagar o vídeo, a cópia convertida e a transcrição.
 - Já tem a legenda? Importe um `.srt` e a transcrição é pulada.
@@ -84,6 +85,7 @@ Sources/
     SoundAnnotations.swift   remove descrições de som ([Music], ♪...)
     Dictionary.swift         dicionário, normalização de palavras
     SavedWords.swift         lista de palavras salvas e exportação CSV
+    Review.swift             revisão com repetição espaçada (SM-2)
     Pronunciation.swift      nota de pronúncia e histórico de prática
     Phonemes.swift           comparação som a som e dicas
   EnglishWithMovies/   app macOS (SwiftUI)
