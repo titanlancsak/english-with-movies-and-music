@@ -1,8 +1,8 @@
 name: Android
 
 # Builds the Android version (app-flutter/): compiles whisper-cli and ffmpeg for
-# 64-bit ARM phones, builds the signed APK and, for version tags, attaches
-# EnglishWithMovies-Android.apk to the GitHub release.
+# 64-bit ARM phones and builds the signed APK (in the run's artifacts; attached
+# to releases once PUBLISH_ANDROID is enabled).
 on:
   push:
     branches: [main]
@@ -79,8 +79,10 @@ jobs:
           name: EnglishWithMovies-Android
           path: EnglishWithMovies-Android.apk
 
+      # Not attached to releases until the Android version is tested on a real phone (issue #1).
+      # To publish it, set the repository variable PUBLISH_ANDROID to "true".
       - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_ANDROID == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: EnglishWithMovies-Android.apk
