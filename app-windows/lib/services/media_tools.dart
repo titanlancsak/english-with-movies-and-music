@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../core/parsers.dart';
 import '../core/transcript.dart';
+import 'log.dart';
 import 'paths.dart';
 
 class ToolException implements Exception {
@@ -162,25 +163,49 @@ enum WhisperModel {
   final String fileName;
   final String title;
 
-  File get file => AppPaths.file(AppPaths.models, fileName);
+  /// The model shipped with the app (tools\models) or the one downloaded later.
+  File get file {
+    final bundled = File(p.join(AppPaths.tools.path, 'models', fileName));
+    return bundled.existsSync() ? bundled : AppPaths.file(AppPaths.models, fileName);
+  }
+
   bool get isDownloaded => file.existsSync();
 
-  /// Downloads the model with progress (0...1).
+  /// Downloads the model with progress (0...1). Fails if no data arrives for 30 seconds.
   Future<void> download(void Function(double) progress) async {
     final url = Uri.parse('https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$fileName');
-    final response = await http.Client().send(http.Request('GET', url));
-    if (response.statusCode != 200) throw ToolException('Falha ao baixar o modelo (${response.statusCode}).');
-    final partial = File('${file.path}.part');
-    final sink = partial.openWrite();
-    final total = response.contentLength ?? 0;
-    var received = 0;
-    await for (final chunk in response.stream) {
-      sink.add(chunk);
-      received += chunk.length;
-      if (total > 0) progress(received / total);
+    final client = http.Client();
+    final partial = File('${AppPaths.file(AppPaths.models, fileName).path}.part');
+    try {
+      final request = http.Request('GET', url)..headers['User-Agent'] = 'EnglishWithMovies/1.0';
+      final response = await client.send(request).timeout(const Duration(seconds: 30));
+      final total = response.contentLength ?? 0;
+      log('Modelo: HTTP ${response.statusCode}, ${(total / 1e6).round()} MB');
+      if (response.statusCode != 200) throw ToolException('Falha ao baixar o modelo (HTTP ${response.statusCode}).');
+      final sink = partial.openWrite();
+      var received = 0, lastPercent = -1;
+      try {
+        await for (final chunk in response.stream.timeout(const Duration(seconds: 30))) {
+          sink.add(chunk);
+          received += chunk.length;
+          final percent = total > 0 ? received * 100 ~/ total : 0;
+          if (percent != lastPercent) {
+            lastPercent = percent;
+            progress(percent / 100);
+            if (percent % 20 == 0) log('Modelo: $percent%');
+          }
+        }
+      } finally {
+        await sink.close();
+      }
+      if (total > 0 && received < total) throw ToolException('O download do modelo foi interrompido. Tente de novo.');
+      await partial.rename(AppPaths.file(AppPaths.models, fileName).path);
+    } on TimeoutException {
+      throw ToolException('O download do modelo parou de responder. Verifique a internet e tente de novo.');
+    } finally {
+      client.close();
+      if (partial.existsSync()) partial.deleteSync();
     }
-    await sink.close();
-    await partial.rename(file.path);
   }
 }
 

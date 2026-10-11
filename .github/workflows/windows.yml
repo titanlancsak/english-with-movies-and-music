@@ -64,6 +64,10 @@ jobs:
           # yt-dlp
           Invoke-WebRequest "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "$tools/yt-dlp.exe"
 
+          # Whisper base model, so the app transcribes on first launch without another download.
+          New-Item -ItemType Directory -Force "$tools/models" | Out-Null
+          Invoke-WebRequest "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin" -OutFile "$tools/models/ggml-base.en.bin"
+
           Copy-Item ../LICENSE "$release/LICENSE.txt"
           Copy-Item windows-release/*.txt $release
 
@@ -86,7 +90,7 @@ jobs:
           & "$release/tools/ffmpeg.exe" -y -loglevel error -f lavfi -i "testsrc2=size=1280x720:rate=24" -i "$test/speech.wav" -shortest -c:v libx264 -pix_fmt yuv420p -c:a aac "$test/test-scene.mp4"
 
           $app = Start-Process "$release/english_with_movies.exe" -ArgumentList "`"$test/test-scene.mp4`"" -PassThru
-          # First run downloads the transcription model (148 MB), then transcribes.
+          # The base model ships with the app, so transcription starts right away.
           # The app writes each step to app.log in its data folder (under %APPDATA%).
           $done = $false
           for ($i = 0; $i -lt 60 -and -not $done; $i++) {

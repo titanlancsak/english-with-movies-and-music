@@ -18,9 +18,8 @@ yt-dlp (tools\yt-dlp.exe)
   License: The Unlicense (public domain)
   Source:  https://github.com/yt-dlp/yt-dlp
 
-Downloaded by the app on first use (not included in this package):
-
-Whisper speech recognition models (ggml format)
+Whisper speech recognition models (ggml format; tools\models\ggml-base.en.bin
+is included, larger models are downloaded by the app when chosen)
   License: MIT (OpenAI Whisper)
   Source:  https://huggingface.co/ggerganov/whisper.cpp
 

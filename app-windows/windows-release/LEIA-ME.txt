@@ -14,8 +14,9 @@ COMO ABRIR
 
 PRIMEIRO USO
 - Arraste um filme ou música para a janela, ou clique em "Escolher arquivo…".
-- Na primeira transcrição, o app baixa o modelo de reconhecimento de voz
-  (148 MB). Depois disso, a transcrição funciona sem internet.
+- A transcrição funciona sem internet: o modelo de reconhecimento de voz
+  "Rápido" já vem junto. Os modelos maiores (mais precisos) são baixados
+  quando você escolhe um deles no topo da janela.
 - O dicionário e a tradução para o português usam a internet.
 - Os vídeos baixados do YouTube ficam em Vídeos\English with Movies.
 
