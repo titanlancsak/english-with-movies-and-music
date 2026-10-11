@@ -136,17 +136,19 @@ class MediaTools {
     _running = process;
     log('Executando $tool');
     final output = StringBuffer();
-    StreamSubscription<String> listen(Stream<List<int>> stream) => stream
+    // forEach returns a future that completes when the stream ends. Both are created
+    // before waiting for the exit code: waiting on an already finished stream never ends.
+    Future<void> read(Stream<List<int>> stream) => stream
         .transform(const Utf8Decoder(allowMalformed: true))
         .transform(const LineSplitter())
-        .listen((line) {
+        .forEach((line) {
           output.writeln(line);
           onLine?.call(line);
-        });
-    final out = listen(process.stdout), err = listen(process.stderr);
+        })
+        .catchError((_) {});
+    final reading = Future.wait([read(process.stdout), read(process.stderr)]);
     final code = await process.exitCode;
-    await out.asFuture<void>().catchError((_) {});
-    await err.asFuture<void>().catchError((_) {});
+    await reading;
     _running = null;
     if (_cancelled) throw CancelledException();
     if (code != 0) {

@@ -1,11 +1,11 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 /// Folders used by the app.
 class AppPaths {
-  /// %APPDATA%\com.titanlancsak\english_with_movies (data the user does not browse).
+  /// %APPDATA%\Santos Lucas\English with Movies & Music on Windows (named after the
+  /// company and product in the .exe). Data the user does not browse.
   static late Directory root;
   static late Directory models;
   static late Directory transcripts;
@@ -19,8 +19,9 @@ class AppPaths {
   /// ffmpeg, yt-dlp and whisper.cpp shipped next to the app (see the release workflow).
   static late Directory tools;
 
-  static Future<void> init() async {
-    root = await getApplicationSupportDirectory();
+  /// [dataFolder] comes from path_provider (see main.dart); this file stays pure Dart so it can be tested.
+  static void init(Directory dataFolder) {
+    root = _dir(dataFolder.path);
     models = _dir(p.join(root.path, 'models'));
     transcripts = _dir(p.join(root.path, 'transcripts'));
     thumbnails = _dir(p.join(root.path, 'thumbnails'));

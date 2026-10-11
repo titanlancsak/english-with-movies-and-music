@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'services/app_controller.dart';
 import 'services/log.dart';
@@ -14,7 +15,7 @@ import 'ui/home.dart';
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
-  await AppPaths.init();
+  AppPaths.init(await getApplicationSupportDirectory());
   log('Iniciando (dados em ${AppPaths.root.path})');
   // Unexpected errors go to app.log instead of disappearing silently.
   FlutterError.onError = (details) {
