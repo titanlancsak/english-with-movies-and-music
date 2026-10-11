@@ -1,0 +1,117 @@
+name: Windows
+
+# Builds the Windows version (app-windows/), bundles the free tools it needs,
+# runs an end-to-end smoke test on a real Windows machine and, for version tags,
+# attaches EnglishWithMovies-Windows.zip to the GitHub release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths: ['app-windows/**', '.github/workflows/windows.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.38.4'
+  # whisper.cpp builds with Windows binaries (the vX.Y.Z tags have none).
+  WHISPER_RELEASE: 'b5454'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: app-windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Tests
+        run: |
+          flutter pub get
+          dart test test/core_test.dart
+
+      - name: Build
+        run: flutter build windows --release
+
+      - name: Bundle ffmpeg, whisper.cpp and yt-dlp
+        run: |
+          $release = "build/windows/x64/runner/Release"
+          $tools = "$release/tools"
+          New-Item -ItemType Directory -Force "$tools/whisper", downloads | Out-Null
+
+          # ffmpeg + ffprobe (shared build: the two programs share the same DLLs).
+          Invoke-WebRequest "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip" -OutFile downloads/ffmpeg.zip
+          Expand-Archive downloads/ffmpeg.zip downloads/ffmpeg
+          $bin = Get-ChildItem downloads/ffmpeg -Recurse -Directory -Filter bin | Select-Object -First 1
+          Copy-Item "$($bin.FullName)/ffmpeg.exe", "$($bin.FullName)/ffprobe.exe" $tools
+          Copy-Item "$($bin.FullName)/*.dll" $tools
+
+          # whisper.cpp (CPU build)
+          Invoke-WebRequest "https://github.com/ggml-org/whisper.cpp/releases/download/$env:WHISPER_RELEASE/whisper-bin-x64.zip" -OutFile downloads/whisper.zip
+          Expand-Archive downloads/whisper.zip downloads/whisper
+          $cli = Get-ChildItem downloads/whisper -Recurse -Filter whisper-cli.exe | Select-Object -First 1
+          Copy-Item "$($cli.DirectoryName)/*" "$tools/whisper" -Recurse
+
+          # yt-dlp
+          Invoke-WebRequest "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "$tools/yt-dlp.exe"
+
+          Copy-Item ../LICENSE "$release/LICENSE.txt"
+          Copy-Item windows-release/*.txt $release
+
+          & "$tools/ffmpeg.exe" -version | Select-Object -First 1
+          & "$tools/whisper/whisper-cli.exe" --help 2>&1 | Select-Object -First 3
+          & "$tools/yt-dlp.exe" --version
+
+      - name: End-to-end test (speech -> app -> live subtitles screenshot)
+        continue-on-error: true
+        run: |
+          $release = (Resolve-Path "build/windows/x64/runner/Release").Path
+          $test = New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/e2e"
+
+          # Speech with the Windows voice, then a test video with that audio.
+          Add-Type -AssemblyName System.Speech
+          $voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
+          $voice.SetOutputToWaveFile("$test/speech.wav")
+          $voice.Speak("Good morning, Captain. The storm is getting closer. We need to leave the harbor before sunset. Do you think the engine will survive another journey?")
+          $voice.Dispose()
+          & "$release/tools/ffmpeg.exe" -y -loglevel error -f lavfi -i "testsrc2=size=1280x720:rate=24" -i "$test/speech.wav" -shortest -c:v libx264 -pix_fmt yuv420p -c:a aac "$test/test-scene.mp4"
+
+          $app = Start-Process "$release/english_with_movies.exe" -ArgumentList "`"$test/test-scene.mp4`"" -PassThru
+          # First run downloads the transcription model (148 MB), then transcribes.
+          $transcripts = "$env:APPDATA/com.titanlancsak/english_with_movies/transcripts"
+          for ($i = 0; $i -lt 60 -and -not (Test-Path "$transcripts/*.json"); $i++) { Start-Sleep 5 }
+          Start-Sleep 4
+          Write-Host "App running: $(-not $app.HasExited)"
+          Get-ChildItem $transcripts -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Raw | Select-Object -First 1 }
+
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+          [System.Drawing.Graphics]::FromImage($bitmap).CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bitmap.Save("$env:GITHUB_WORKSPACE/windows-screenshot.png")
+          if (-not $app.HasExited) { Stop-Process $app.Id }
+
+      - name: Package
+        run: Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "$env:GITHUB_WORKSPACE/EnglishWithMovies-Windows.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EnglishWithMovies-Windows
+          path: |
+            EnglishWithMovies-Windows.zip
+            windows-screenshot.png
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: EnglishWithMovies-Windows.zip

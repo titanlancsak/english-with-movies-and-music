@@ -1,0 +1,33 @@
+Third-party software included in this package
+==============================================
+
+English with Movies & Music is released under the MIT License (LICENSE.txt).
+The "tools" folder contains separate programs, distributed unmodified under
+their own licenses:
+
+FFmpeg (tools\ffmpeg.exe, tools\ffprobe.exe and their DLLs)
+  License: GNU General Public License v3 (GPL build by BtbN)
+  Build:   https://github.com/BtbN/FFmpeg-Builds
+  Source:  https://ffmpeg.org/download.html and https://github.com/FFmpeg/FFmpeg
+
+whisper.cpp (tools\whisper\)
+  License: MIT
+  Source:  https://github.com/ggml-org/whisper.cpp
+
+yt-dlp (tools\yt-dlp.exe)
+  License: The Unlicense (public domain)
+  Source:  https://github.com/yt-dlp/yt-dlp
+
+Downloaded by the app on first use (not included in this package):
+
+Whisper speech recognition models (ggml format)
+  License: MIT (OpenAI Whisper)
+  Source:  https://huggingface.co/ggerganov/whisper.cpp
+
+Online services used by the app:
+  Wiktionary (definitions and examples), CC BY-SA 4.0 — https://en.wiktionary.org
+  Free Dictionary API — https://dictionaryapi.dev
+  MyMemory translation API — https://mymemory.translated.net
+
+Flutter packages are listed in the source code (app-windows/pubspec.yaml),
+each under its own open-source license.
