@@ -14,8 +14,6 @@
   &nbsp;·&nbsp;
   <a href="https://github.com/titanlancsak/english-with-movies-and-music/releases/latest/download/EnglishWithMovies-Windows.zip"><b>⬇️ Baixar para Windows</b></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/titanlancsak/english-with-movies-and-music/releases/latest/download/EnglishWithMovies-Android.apk"><b>⬇️ Baixar para Android</b></a>
-  &nbsp;·&nbsp;
   <a href="https://github.com/titanlancsak/english-with-movies-and-music/releases">Todas as versões</a>
 </p>
 
@@ -34,7 +32,7 @@ Tudo é gratuito: o app e todas as ferramentas que ele usa são de código abert
 
 ## Funcionalidades
 
-| | Mac | Windows | Android |
+| | Mac | Windows | Android (em teste) |
 |---|:---:|:---:|:---:|
 | 🎬 **Biblioteca estilo Netflix**: capas, "Continuar assistindo", filmes e músicas | ✅ | ✅ | ✅ |
 | ⏯️ **Continua de onde você parou** | ✅ | ✅ | ✅ |
@@ -95,19 +93,11 @@ Requisitos: Windows 10 ou 11 (64 bits). Não precisa instalar mais nada: as ferr
 3. Abra a pasta extraída e dê dois cliques em **english_with_movies.exe**.
 4. **Na primeira vez**, o Windows pode mostrar *“O Windows protegeu o computador”* (o app não tem um certificado pago). Clique em **Mais informações › Executar assim mesmo**.
 
-### 🤖 Android
+### 🤖 Android (em teste)
 
-Requisitos: Android 7 ou mais novo, celular de 64 bits (praticamente todos os aparelhos dos últimos 6 anos). O app tem uns 20 MB.
+A versão Android já está pronta no código e foi testada num emulador, mas **ainda não está disponível para download**: falta testar num celular de verdade. O andamento está na [issue #1](https://github.com/titanlancsak/english-with-movies-and-music/issues/1).
 
-1. No celular, baixe **[EnglishWithMovies-Android.apk](https://github.com/titanlancsak/english-with-movies-and-music/releases/latest/download/EnglishWithMovies-Android.apk)**.
-2. Abra o arquivo baixado (pela notificação ou pelo app **Arquivos › Downloads**).
-3. **Na primeira vez**, o Android pede para permitir a instalação de apps desta fonte (o app não está na Play Store). Toque em **Configurações**, ative **Permitir desta fonte**, volte e toque em **Instalar**.
-4. Se o Play Protect avisar que o app é desconhecido, toque em **Mais detalhes › Instalar mesmo assim**.
-
-No celular:
-- Toque em **Escolher arquivo…** e escolha um filme ou música que esteja no aparelho. O app guarda uma cópia na biblioteca dele (dá para apagar depois, segurando o dedo na capa).
-- A primeira transcrição baixa o modelo de reconhecimento de voz (**148 MB**, uma vez só). Use Wi-Fi.
-- A transcrição roda no próprio celular: um filme de 2 horas leva por volta de 20 a 40 minutos num celular recente. Deixe o app aberto; a tela fica acesa enquanto isso. Músicas e cenas curtas ficam prontas em segundos. Com uma legenda `.srt` (menu ⋮ › **Importar legenda**), não é preciso esperar.
+Como vai funcionar: Android 7 ou mais novo, celular de 64 bits, app de uns 20 MB instalado pelo arquivo `.apk` (fora da Play Store). Você escolhe um filme ou música que está no celular, e a transcrição roda no próprio aparelho (um filme de 2 horas deve levar de 20 a 40 minutos num celular recente; com uma legenda `.srt` não é preciso esperar).
 
 ### Primeiro uso (Mac e Windows)
 
