@@ -12,6 +12,7 @@ import '../services/app_controller.dart';
 import '../services/log.dart';
 import 'common.dart';
 import 'practice_dialog.dart';
+import 'theme.dart';
 import 'word_dialog.dart';
 
 /// Video on top, live subtitles below.
@@ -26,25 +27,58 @@ class PlayerScreen extends StatelessWidget {
           ColoredBox(color: Colors.black, child: Video(controller: app.video)),
           if (app.isAudio)
             IgnorePointer(
-              child: Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.music_note, size: 56, color: Colors.white70),
-                  Text(app.sourceName ?? '', style: const TextStyle(fontSize: 18, color: Colors.white70)),
-                ]),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.indigo.withValues(alpha: 0.6), AppColors.violet.withValues(alpha: 0.5), AppColors.orange.withValues(alpha: 0.35)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.music_note_rounded, size: 56, color: Colors.white),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(app.sourceName ?? '',
+                          textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                  ]),
+                ),
               ),
             ),
         ]);
     return LayoutBuilder(builder: (context, constraints) {
-      // A phone held upright: a 16:9 video on top, the subtitles take the rest.
-      final portrait = constraints.maxHeight > constraints.maxWidth;
-      return Column(children: [
-        if (portrait)
-          SizedBox(height: min(constraints.maxWidth * 9 / 16, constraints.maxHeight * 0.45), child: video)
-        else
-          Expanded(flex: 5, child: video),
-        const Divider(height: 1),
-        Expanded(flex: 4, child: const TranscriptPanel()),
-      ]);
+      // A phone held upright: a full-width 16:9 video on top, the subtitles take the rest.
+      if (constraints.maxHeight > constraints.maxWidth && constraints.maxWidth < 700) {
+        return Column(children: [
+          SizedBox(height: min(constraints.maxWidth * 9 / 16, constraints.maxHeight * 0.45), child: video),
+          const Expanded(child: TranscriptPanel()),
+        ]);
+      }
+      // Computer: the video in a rounded card with a glow, the subtitles in a glass panel.
+      final videoHeight = min(constraints.maxWidth * 9 / 16, constraints.maxHeight * 0.56);
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        child: Column(children: [
+          Center(
+            child: Container(
+              width: videoHeight * 16 / 9,
+              height: videoHeight,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.stroke),
+                boxShadow: [BoxShadow(color: AppColors.indigo.withValues(alpha: 0.35), blurRadius: 40, offset: const Offset(0, 10))],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: video,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Expanded(child: GlassCard(radius: 18, child: TranscriptPanel())),
+        ]),
+      );
     });
   }
 }
@@ -90,13 +124,13 @@ class _TranscriptPanelState extends State<TranscriptPanel> {
   Widget _build(BuildContext context) {
     final transcript = app.transcript;
     if (transcript == null) {
-      return const Center(
-        child: Text('A legenda aparece aqui assim que a transcrição terminar.\nVocê já pode assistir enquanto isso.',
-            textAlign: TextAlign.center, style: TextStyle(color: Colors.white54)),
-      );
+      return const EmptyState(
+          icon: Icons.subtitles_rounded,
+          title: 'Preparando a legenda',
+          text: 'A legenda aparece aqui assim que a transcrição terminar.\nVocê já pode assistir enquanto isso.');
     }
     if (transcript.lines.isEmpty) {
-      return const Center(child: Text('Nenhuma fala encontrada neste arquivo.', style: TextStyle(color: Colors.white54)));
+      return const EmptyState(icon: Icons.speaker_notes_off_rounded, title: 'Nenhuma fala encontrada', text: 'Este arquivo não tem falas em inglês reconhecíveis.');
     }
     if (!identical(_loggedTranscript, transcript)) {
       _loggedTranscript = transcript;
@@ -113,7 +147,7 @@ class _TranscriptPanelState extends State<TranscriptPanel> {
           listenable: Listenable.merge([app.activeLine, app.activeWord, app.savedWords, app.practice, app]),
           builder: (context, _) => ScrollablePositionedList.builder(
             itemScrollController: _scroll,
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             itemCount: transcript.lines.length,
             itemBuilder: (context, index) {
               final isActive = index == app.activeLine.value;
@@ -129,14 +163,14 @@ class _TranscriptPanelState extends State<TranscriptPanel> {
             : Positioned(
                 right: 16,
                 bottom: 16,
-                child: FilledButton.icon(
+                child: PrimaryButton(
                   onPressed: () {
                     app.follow.value = true;
                     final line = app.activeLine.value;
                     if (line != null) _scroll.jumpTo(index: line, alignment: 0.35);
                   },
-                  icon: const Icon(Icons.my_location),
-                  label: const Text('Voltar para a fala atual'),
+                  icon: Icons.my_location,
+                  label: 'Voltar para a fala atual',
                 ),
               ),
       ),
@@ -144,67 +178,88 @@ class _TranscriptPanelState extends State<TranscriptPanel> {
   }
 }
 
-class LineRow extends StatelessWidget {
+class LineRow extends StatefulWidget {
   const LineRow({super.key, required this.line, required this.isActive, this.activeWord});
   final TranscriptLine line;
   final bool isActive;
   final int? activeWord;
 
   @override
+  State<LineRow> createState() => _LineRowState();
+}
+
+class _LineRowState extends State<LineRow> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
+    final line = widget.line;
+    final isActive = widget.isActive;
+    final activeWord = widget.activeWord;
     final best = app.practice.record(line, app.sourceName)?.best;
     final compact = isCompact(context);
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: compact ? 4 : 8, vertical: 2),
-      padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 12, vertical: isActive ? 10 : 4),
-      decoration: BoxDecoration(
-        color: isActive ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.14) : null,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(
-          width: compact ? 62 : 70,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            InkWell(
-              onTap: () => app.seek(line.start),
-              child: Text(formatTime(line.start), style: const TextStyle(color: Colors.white54, fontSize: 12)),
-            ),
-            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-              if (best != null)
-                Tooltip(
-                  message: 'Sua melhor nota nesta fala',
-                  child: Text('$best', style: TextStyle(color: scoreColor(best), fontSize: 11, fontWeight: FontWeight.bold)),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: EdgeInsets.symmetric(horizontal: compact ? 6 : 10, vertical: 1),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 14, vertical: isActive ? 14 : 6),
+        decoration: BoxDecoration(
+          gradient: isActive
+              ? LinearGradient(colors: [AppColors.indigo.withValues(alpha: 0.22), AppColors.violet.withValues(alpha: 0.12)])
+              : null,
+          color: isActive ? null : (_hovered ? AppColors.surface : Colors.transparent),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        foregroundDecoration: isActive ? const _AccentBar() : null,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(
+            width: compact ? 58 : 70,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              InkWell(
+                onTap: () => app.seek(line.start),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(formatTime(line.start),
+                      style: TextStyle(color: isActive ? AppColors.violet : AppColors.textDim, fontSize: 11.5, fontWeight: FontWeight.w700)),
                 ),
-              IconButton(
-                iconSize: 18,
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Praticar a pronúncia desta fala',
-                icon: Icon(Icons.mic_none, color: isActive ? Theme.of(context).colorScheme.primary : Colors.white38),
-                onPressed: () {
-                  app.player.pause();
-                  showPracticeDialog(context, line);
-                },
               ),
+              const SizedBox(height: 6),
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                if (best != null) ...[TagChip('$best', color: scoreColor(best)), const SizedBox(width: 4)],
+                if (isActive || _hovered || isMobile)
+                  GlassIconButton(
+                    icon: Icons.mic_rounded,
+                    size: 26,
+                    color: isActive ? AppColors.violet : Colors.white,
+                    tooltip: 'Praticar a pronúncia desta fala',
+                    onPressed: () {
+                      app.player.pause();
+                      showPracticeDialog(context, line);
+                    },
+                  ),
+              ]),
             ]),
-          ]),
-        ),
-        SizedBox(width: compact ? 6 : 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Wrap(spacing: 5, runSpacing: 4, children: [
-              for (var i = 0; i < line.words.length; i++)
-                _Word(
-                  word: line.words[i],
-                  line: line,
-                  isLineActive: isActive,
-                  isSpoken: isActive && activeWord != null && i <= activeWord!,
-                  isCurrent: isActive && activeWord == i,
-                ),
+          ),
+          SizedBox(width: compact ? 8 : 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Wrap(spacing: 4, runSpacing: 6, children: [
+                for (var i = 0; i < line.words.length; i++)
+                  _Word(
+                    word: line.words[i],
+                    line: line,
+                    isLineActive: isActive,
+                    isSpoken: isActive && activeWord != null && i <= activeWord,
+                    isCurrent: isActive && activeWord == i,
+                  ),
+              ]),
+              if (isActive && app.showTranslation) _ActiveTranslation(text: line.text),
             ]),
-            if (isActive && app.showTranslation) _ActiveTranslation(text: line.text),
-          ]),
-        ),
-      ]),
+          ),
+        ]),
+      ),
     );
   }
 }
@@ -219,10 +274,10 @@ class _Word extends StatelessWidget {
   Widget build(BuildContext context) {
     final saved = app.savedWords.contains(word.text);
     final color = !isLineActive
-        ? Colors.white60
+        ? Colors.white.withValues(alpha: 0.6)
         : isSpoken
             ? Colors.white
-            : Colors.white.withValues(alpha: 0.55);
+            : Colors.white.withValues(alpha: 0.42);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -231,17 +286,19 @@ class _Word extends StatelessWidget {
           app.player.pause();
           showWordDialog(context, word.text, line);
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          padding: EdgeInsets.symmetric(horizontal: isCurrent ? 7 : 2, vertical: isCurrent ? 1 : 0),
           decoration: BoxDecoration(
-            color: isCurrent ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.35) : null,
-            borderRadius: BorderRadius.circular(4),
+            gradient: isCurrent ? AppColors.brand : null,
+            borderRadius: BorderRadius.circular(99),
+            boxShadow: isCurrent ? [BoxShadow(color: AppColors.violet.withValues(alpha: 0.6), blurRadius: 10)] : null,
           ),
           child: Text(
             word.text,
             style: TextStyle(
-              fontSize: isCompact(context) ? (isLineActive ? 19 : 15) : (isLineActive ? 21 : 16),
-              fontWeight: isLineActive ? FontWeight.bold : FontWeight.normal,
+              fontSize: isCompact(context) ? (isLineActive ? 20 : 15) : (isLineActive ? 22 : 16),
+              fontWeight: isLineActive ? FontWeight.w800 : FontWeight.normal,
               color: color,
               decoration: saved ? TextDecoration.underline : null,
               decorationColor: accentOrange,
@@ -269,9 +326,27 @@ class _ActiveTranslation extends StatelessWidget {
         padding: const EdgeInsets.only(top: 6),
         child: Text(
           snapshot.data ?? app.translator.problem ?? 'traduzindo…',
-          style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.white70, fontSize: 15),
+          style: const TextStyle(fontStyle: FontStyle.italic, color: AppColors.orange, fontSize: 15),
         ),
       ),
     );
+  }
+}
+
+/// The gradient bar on the left of the line being spoken.
+class _AccentBar extends Decoration {
+  const _AccentBar();
+
+  @override
+  BoxPainter createBoxPainter([VoidCallback? onChanged]) => _AccentBarPainter();
+}
+
+class _AccentBarPainter extends BoxPainter {
+  @override
+  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
+    final size = configuration.size!;
+    final rect = Rect.fromLTWH(offset.dx, offset.dy + 12, 3, size.height - 24);
+    canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(2)), Paint()
+      ..shader = LinearGradient(colors: AppColors.warm.colors, begin: Alignment.topCenter, end: Alignment.bottomCenter).createShader(rect));
   }
 }

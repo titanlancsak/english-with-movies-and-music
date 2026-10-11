@@ -26,6 +26,9 @@ late final AppController app;
 
 enum Status { idle, working, ready, failed }
 
+/// The screens in the sidebar (bottom bar on a phone).
+enum AppSection { library, player, savedWords, review, practice }
+
 class AppController extends ChangeNotifier {
   AppController() {
     final settings = _settings;
@@ -57,6 +60,7 @@ class AppController extends ChangeNotifier {
   final player = Player();
   late final video = VideoController(player);
 
+  AppSection section = AppSection.library;
   String? mediaPath;
   Transcript? transcript;
   Status status = Status.idle;
@@ -98,6 +102,14 @@ class AppController extends ChangeNotifier {
 
   void _saveSettings() => _settingsFile.writeAsStringSync(jsonEncode({'model': model.name, 'showTranslation': showTranslation}));
 
+  /// Leaving the player pauses it; the film stays open under "Assistindo".
+  void showSection(AppSection value) {
+    if (value == AppSection.player && mediaPath == null) return;
+    if (value != AppSection.player) player.pause();
+    section = value;
+    notifyListeners();
+  }
+
   void setModel(WhisperModel value) {
     model = value;
     _saveSettings();
@@ -114,7 +126,9 @@ class AppController extends ChangeNotifier {
 
   Future<void> open(String path, {double? at}) async {
     if (p.extension(path).toLowerCase() == '.srt') return importSubtitles(path);
+    section = AppSection.player;
     if (at != null && path == mediaPath) {
+      notifyListeners();
       seek(at);
       await player.play();
       return;
@@ -153,6 +167,7 @@ class AppController extends ChangeNotifier {
     mediaPath = null;
     transcript = null;
     status = Status.idle;
+    section = AppSection.library;
     library.refresh();
     notifyListeners();
   }

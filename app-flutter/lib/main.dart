@@ -11,6 +11,7 @@ import 'services/app_controller.dart';
 import 'services/log.dart';
 import 'services/paths.dart';
 import 'ui/home.dart';
+import 'ui/theme.dart';
 
 /// [args]: a file to open, e.g. from "Open with" in Windows Explorer.
 Future<void> main(List<String> args) async {
@@ -46,12 +47,7 @@ class EnglishWithMoviesApp extends StatelessWidget {
     return MaterialApp(
       title: 'English with Movies & Music',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6366F1), brightness: Brightness.dark),
-        scaffoldBackgroundColor: const Color(0xFF141419),
-        useMaterial3: true,
-      ),
+      theme: buildTheme(),
       home: const HomeScreen(),
     );
   }

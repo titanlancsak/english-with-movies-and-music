@@ -3,7 +3,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-const accentOrange = Color(0xFFF97316);
+import 'theme.dart';
+
+const accentOrange = AppColors.orange;
 
 /// Phones: no YouTube downloads (not allowed in the app stores), no drag and drop,
 /// files are imported into the app.
@@ -13,10 +15,10 @@ final isMobile = Platform.isAndroid || Platform.isIOS;
 bool isCompact(BuildContext context) => MediaQuery.sizeOf(context).width < 700;
 
 Color scoreColor(int score) => score >= 80
-    ? Colors.green
+    ? AppColors.green
     : score >= 60
-        ? Colors.orange
-        : Colors.red;
+        ? AppColors.yellow
+        : AppColors.red;
 
 String scoreLabel(int score) => score >= 90
     ? 'Excelente!'
@@ -81,7 +83,7 @@ class ScoreRing extends StatelessWidget {
       child: CustomPaint(
         painter: _RingPainter(score / 100, scoreColor(score)),
         child: Center(
-          child: Text('$score', style: TextStyle(fontSize: size * 0.34, fontWeight: FontWeight.bold)),
+          child: Text('$score', style: TextStyle(fontSize: size * 0.34, fontWeight: FontWeight.w900)),
         ),
       ),
     );
@@ -97,9 +99,20 @@ class _RingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final stroke = size.width * 0.1;
     final rect = Offset(stroke / 2, stroke / 2) & Size(size.width - stroke, size.height - stroke);
-    canvas.drawArc(rect, 0, 2 * pi, false, Paint()..color = Colors.white12..style = PaintingStyle.stroke..strokeWidth = stroke);
+    canvas.drawArc(rect, 0, 2 * pi, false, Paint()..color = Colors.white10..style = PaintingStyle.stroke..strokeWidth = stroke);
+    if (value <= 0) return;
+    final sweep = SweepGradient(
+      startAngle: 0,
+      endAngle: 2 * pi * value,
+      colors: [color.withValues(alpha: 0.55), color],
+      transform: const GradientRotation(-pi / 2),
+    ).createShader(rect);
+    // A soft glow under the arc, then the arc itself.
     canvas.drawArc(rect, -pi / 2, 2 * pi * value, false,
-        Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = stroke..strokeCap = StrokeCap.round);
+        Paint()..color = color.withValues(alpha: 0.35)..style = PaintingStyle.stroke..strokeWidth = stroke..strokeCap = StrokeCap.round
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, stroke * 0.8));
+    canvas.drawArc(rect, -pi / 2, 2 * pi * value, false,
+        Paint()..shader = sweep..style = PaintingStyle.stroke..strokeWidth = stroke..strokeCap = StrokeCap.round);
   }
 
   @override

@@ -9,6 +9,7 @@ import '../core/saved_words.dart';
 import '../core/word_normalizer.dart';
 import '../services/app_controller.dart';
 import 'common.dart';
+import 'theme.dart';
 
 enum ReviewMode {
   englishToPortuguese('Inglês → Português', 'EN → PT'),
@@ -94,26 +95,30 @@ class _ReviewScreenState extends State<ReviewScreen> {
       },
       child: Focus(
         autofocus: true,
-        child: Scaffold(
-          appBar: AppBar(title: const Text('Revisão de palavras')),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(children: [
-                  SegmentedButton<ReviewMode>(
-                    segments: [for (final m in ReviewMode.values) ButtonSegment(value: m, label: Text(isCompact(context) ? m.shortTitle : m.title))],
-                    selected: {_mode},
-                    onSelectionChanged: (selection) {
+                padding: EdgeInsets.fromLTRB(isCompact(context) ? 16 : 28, 12, isCompact(context) ? 16 : 28, 20),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  // Short windows (a phone on its side) keep the room for the card.
+                  if (MediaQuery.sizeOf(context).height >= 600) ...[
+                    ScreenTitle('Revisão',
+                        subtitle: isCompact(context) ? null : 'Cartões com repetição espaçada: quem você erra volta logo, quem você sabe volta depois.'),
+                    const SizedBox(height: 16),
+                  ],
+                  _ModePicker(
+                    mode: _mode,
+                    onChanged: (mode) {
                       setState(() {
-                        _mode = selection.first;
+                        _mode = mode;
                         _flipped = false;
                       });
                       _speakIfListening();
                     },
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   if (_running && word != null) ...[
                     _progress(),
                     const SizedBox(height: 16),
@@ -127,7 +132,6 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ]),
               ),
             ),
-          ),
         ),
       ),
     );
@@ -135,10 +139,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   Widget _progress() {
     final done = _sessionSize - _queue.toSet().length;
-    return Column(children: [
-      LinearProgressIndicator(value: _sessionSize == 0 ? 0 : done / _sessionSize),
-      const SizedBox(height: 4),
-      Text('$done de $_sessionSize palavras', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+    return Row(children: [
+      Expanded(child: GradientProgress(value: _sessionSize == 0 ? 0 : done / _sessionSize)),
+      const SizedBox(width: 12),
+      Text('$done/$_sessionSize', style: const TextStyle(color: AppColors.textDim, fontSize: 12, fontWeight: FontWeight.w700)),
     ]);
   }
 
@@ -162,8 +166,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    colors: [AppColors.indigo.withValues(alpha: 0.28), AppColors.violet.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0.03)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: AppColors.violet.withValues(alpha: 0.45)),
+                  boxShadow: [BoxShadow(color: AppColors.violet.withValues(alpha: 0.25), blurRadius: 30, offset: const Offset(0, 12))],
                 ),
                 child: Center(child: SingleChildScrollView(child: showBack ? _back(word) : _front(word))),
               ),
@@ -175,14 +185,15 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   Widget _speak(SavedWord word) =>
-      IconButton(icon: const Icon(Icons.volume_up), tooltip: 'Ouvir a pronúncia', onPressed: () => app.speaker.say(word.word));
+      GlassIconButton(icon: Icons.volume_up_rounded, tooltip: 'Ouvir a pronúncia', onPressed: () => app.speaker.say(word.word));
 
   Widget _front(SavedWord word) {
     switch (_mode) {
       case ReviewMode.englishToPortuguese:
         return Column(children: [
-          Text(word.word, style: const TextStyle(fontSize: 44, fontWeight: FontWeight.bold)),
-          if (word.phonetic != null) Text(word.phonetic!, style: const TextStyle(color: Colors.white54)),
+          GradientText(word.word, textAlign: TextAlign.center, style: const TextStyle(fontSize: 50, fontWeight: FontWeight.w900)),
+          if (word.phonetic != null) Text(word.phonetic!, style: const TextStyle(color: AppColors.textDim)),
+          const SizedBox(height: 10),
           _speak(word),
           if (word.context != null) ...[
             const SizedBox(height: 8),
@@ -204,7 +215,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
         ]);
       case ReviewMode.listening:
         return Column(children: [
-          IconButton(iconSize: 64, icon: const Icon(Icons.volume_up), tooltip: 'Ouvir de novo', onPressed: () => app.speaker.say(word.word)),
+          GlassIconButton(icon: Icons.volume_up_rounded, tooltip: 'Ouvir de novo', size: 96, color: AppColors.violet, onPressed: () => app.speaker.say(word.word)),
           const SizedBox(height: 12),
           const Text('Que palavra é essa? O que significa?', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
         ]);
@@ -231,13 +242,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
         const Divider(height: 24),
         _highlighted(word.context!, word, const TextStyle(fontStyle: FontStyle.italic)),
         if (source != null && File(source).existsSync())
-          TextButton.icon(
-            onPressed: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-              app.open(source, at: word.sourceTime ?? 0);
-            },
-            icon: const Icon(Icons.movie, size: 18),
-            label: Text('Ver no ${word.sourceName ?? 'filme'}'),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: GlassButton(
+              label: 'Ver no ${word.sourceName ?? 'filme'}',
+              icon: Icons.movie_rounded,
+              onPressed: () => app.open(source, at: word.sourceTime ?? 0),
+            ),
           ),
       ],
     ]);
@@ -260,29 +271,38 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   Widget _buttons(SavedWord word) {
     if (!_flipped) {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton(
-          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-          onPressed: () => setState(() => _flipped = true),
-          // The keyboard shortcuts only exist on a computer.
-          child: Text(isMobile ? 'Mostrar resposta' : 'Mostrar resposta  (espaço)', style: const TextStyle(fontSize: 16)),
-        ),
+      return PrimaryButton(
+        expand: true,
+        icon: Icons.flip_rounded,
+        // The keyboard shortcuts only exist on a computer.
+        label: isMobile ? 'Mostrar resposta' : 'Mostrar resposta  (espaço)',
+        onPressed: () => setState(() => _flipped = true),
       );
     }
-    const colors = [Colors.red, Colors.orange, Colors.green, Colors.blue];
+    const colors = [AppColors.red, AppColors.yellow, AppColors.green, AppColors.blue];
     return Row(children: [
       for (final grade in ReviewGrade.values)
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: colors[grade.index], padding: const EdgeInsets.symmetric(vertical: 12)),
-              onPressed: () => _answer(grade),
-              child: Column(children: [
-                Text(isMobile ? grade.title : '${grade.title}  (${grade.index + 1})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(describeNextReview(word.review, grade, DateTime.now()), style: const TextStyle(fontSize: 12)),
-              ]),
+            child: Material(
+              color: colors[grade.index].withValues(alpha: 0.22),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: colors[grade.index].withValues(alpha: 0.6)),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _answer(grade),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 4),
+                  child: Column(children: [
+                    Text(isMobile ? grade.title : '${grade.title}  (${grade.index + 1})',
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text(describeNextReview(word.review, grade, DateTime.now()), style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  ]),
+                ),
+              ),
             ),
           ),
         ),
@@ -293,42 +313,80 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final list = app.savedWords.list;
     final next = list.nextDueDate();
     return Column(children: [
-      Text('${list.words.length} palavras salvas · ${list.masteredCount()} dominadas', style: const TextStyle(color: Colors.white60)),
-      if (next != null) Text('Próxima revisão ${relativeTime(next)}', style: const TextStyle(color: Colors.white60)),
+      Text('${list.words.length} palavras salvas · ${list.masteredCount()} dominadas', style: const TextStyle(color: AppColors.textDim)),
+      if (next != null) Text('Próxima revisão ${relativeTime(next)}', style: const TextStyle(color: AppColors.textDim)),
     ]);
   }
 
   Widget _finished() {
     final due = app.savedWords.list.due().length;
     return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const Icon(Icons.verified, size: 56, color: Colors.green),
+      const EmptyStateIcon(Icons.verified_rounded),
       const SizedBox(height: 12),
-      const Text('Revisão concluída!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+      const Text('Revisão concluída!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
       const SizedBox(height: 8),
       Text('Você revisou $_reviewed cartões e lembrou de $_remembered '
           '(${_reviewed == 0 ? 0 : _remembered * 100 ~/ _reviewed}%).'),
       const SizedBox(height: 8),
       _stats(),
       const SizedBox(height: 16),
-      if (due > 0) FilledButton(onPressed: () => _start(all: false), child: Text('Continuar revisando ($due)')),
+      if (due > 0) PrimaryButton(label: 'Continuar revisando ($due)', onPressed: () => _start(all: false)),
     ]);
   }
 
   Widget _empty() {
     if (app.savedWords.list.words.isEmpty) {
-      return const Center(
-        child: Text('Nenhuma palavra salva ainda.\nToque numa palavra da legenda e depois em 🔖 para salvar.',
-            textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
-      );
+      return const EmptyState(
+          icon: Icons.style_rounded,
+          title: 'Nenhuma palavra salva ainda',
+          text: 'Toque numa palavra da legenda e depois em 🔖 para salvar. Ela aparece aqui para revisar.');
     }
     return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const Icon(Icons.check_circle, size: 56, color: Colors.green),
+      const EmptyStateIcon(Icons.check_circle_rounded),
       const SizedBox(height: 12),
-      const Text('Tudo em dia!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+      const Text('Tudo em dia!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
       const SizedBox(height: 8),
       _stats(),
       const SizedBox(height: 16),
       OutlinedButton(onPressed: () => _start(all: true), child: const Text('Revisar todas mesmo assim')),
     ]);
+  }
+}
+
+/// The review modes as a glass capsule; the selected one is filled with the brand gradient.
+class _ModePicker extends StatelessWidget {
+  const _ModePicker({required this.mode, required this.onChanged});
+  final ReviewMode mode;
+  final ValueChanged<ReviewMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = isCompact(context);
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(99), border: Border.all(color: AppColors.stroke)),
+      child: Row(children: [
+        for (final option in ReviewMode.values)
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(option),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    gradient: option == mode ? AppColors.brand : null,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(compact ? option.shortTitle : option.title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: option == mode ? Colors.white : AppColors.textDim)),
+                ),
+              ),
+            ),
+          ),
+      ]),
+    );
   }
 }
