@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -77,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onDragExited: (_) => setState(() => _dragging = false),
           onDragDone: (details) {
             setState(() => _dragging = false);
-            if (details.files.isNotEmpty) app.open(details.files.first.path);
+            if (details.files.isNotEmpty) unawaited(app.open(details.files.first.path));
           },
           child: Column(
             children: [

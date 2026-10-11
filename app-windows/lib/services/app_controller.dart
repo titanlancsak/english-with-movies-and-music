@@ -12,6 +12,7 @@ import '../core/pronunciation.dart';
 import '../core/saved_words.dart';
 import '../core/transcript.dart';
 import 'language.dart';
+import 'log.dart';
 import 'media_tools.dart';
 import 'paths.dart';
 import 'stores.dart';
@@ -111,13 +112,20 @@ class AppController extends ChangeNotifier {
     library.recordOpened(path);
     notifyListeners();
 
-    await player.open(Media(path), play: false);
-    if (at != null && at > 0) {
-      await player.stream.duration.firstWhere((d) => d > Duration.zero).timeout(const Duration(seconds: 10), onTimeout: () => Duration.zero);
-      await player.seek(Duration(milliseconds: (at * 1000).round()));
+    log('Abrindo $path');
+    // Transcription starts right away; it must not wait for the player
+    // (on Windows, media_kit's play() future may never complete).
+    unawaited(_transcribe(path, skipCache: false));
+    try {
+      await player.open(Media(path), play: false);
+      if (at != null && at > 0) {
+        await player.stream.duration.firstWhere((d) => d > Duration.zero).timeout(const Duration(seconds: 10), onTimeout: () => Duration.zero);
+        await player.seek(Duration(milliseconds: (at * 1000).round()));
+      }
+      unawaited(player.play());
+    } catch (error) {
+      log('Erro no player: $error');
     }
-    await player.play();
-    await _transcribe(path, skipCache: false);
   }
 
   /// Back to the library.
@@ -151,6 +159,7 @@ class AppController extends ChangeNotifier {
     cancel();
     final tools = _tools = MediaTools();
     _setWorking('Baixando o vídeo…', 0);
+    log('Baixando $link');
     try {
       final file = await tools.downloadVideo(link.trim(), AppPaths.downloads.path, progress: _setProgress);
       await open(file);
@@ -169,9 +178,16 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> _transcribe(String path, {required bool skipCache}) async {
-    final key = TranscriptCache.key(path, model.fileName);
+    final String key;
+    try {
+      key = TranscriptCache.key(path, model.fileName);
+    } catch (error) {
+      _report(error);
+      return;
+    }
     final cached = skipCache ? null : TranscriptCache.load(key);
     if (cached != null) {
+      log('Transcrição em cache: ${cached.lines.length} falas');
       transcript = cached;
       status = Status.ready;
       notifyListeners();
@@ -182,12 +198,15 @@ class AppController extends ChangeNotifier {
     try {
       if (!model.isDownloaded) {
         _setWorking('Baixando o modelo de transcrição (só na primeira vez)…', 0);
+        log('Baixando o modelo ${model.fileName}');
         await model.download(_setProgress);
       }
       _setWorking('Extraindo o áudio…', null);
       await tools.extractAudio(path, wav);
       _setWorking('Transcrevendo as falas…', 0);
+      log('Transcrevendo com ${model.fileName}');
       final result = await tools.transcribe(wav, model.file.path, progress: _setProgress);
+      log('Transcrição pronta: ${result.lines.length} falas');
       if (path != mediaPath) return;
       TranscriptCache.save(result, key);
       transcript = result;
@@ -216,6 +235,7 @@ class AppController extends ChangeNotifier {
 
   void _report(Object error) {
     if (error is CancelledException) return;
+    log('Erro: $error');
     status = Status.failed;
     message = error.toString();
     notifyListeners();

@@ -87,11 +87,17 @@ jobs:
 
           $app = Start-Process "$release/english_with_movies.exe" -ArgumentList "`"$test/test-scene.mp4`"" -PassThru
           # First run downloads the transcription model (148 MB), then transcribes.
-          $transcripts = "$env:APPDATA/com.titanlancsak/english_with_movies/transcripts"
-          for ($i = 0; $i -lt 60 -and -not (Test-Path "$transcripts/*.json"); $i++) { Start-Sleep 5 }
+          # The app writes each step to app.log in its data folder (under %APPDATA%).
+          $done = $false
+          for ($i = 0; $i -lt 60 -and -not $done; $i++) {
+            Start-Sleep 5
+            $logFile = Get-ChildItem $env:APPDATA -Recurse -Filter app.log -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($logFile) { $done = Select-String -Path $logFile.FullName -Pattern "Transcrição pronta|Erro" -Quiet }
+          }
           Start-Sleep 4
           Write-Host "App running: $(-not $app.HasExited)"
-          Get-ChildItem $transcripts -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Raw | Select-Object -First 1 }
+          Write-Host "---- app.log ----"
+          if ($logFile) { Get-Content $logFile.FullName -Encoding UTF8 }
 
           Add-Type -AssemblyName System.Windows.Forms, System.Drawing
           $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
