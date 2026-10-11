@@ -1,18 +1,19 @@
 import AppKit
 import SwiftUI
 
-/// Home screen: featured item and rows of covers, Netflix style.
+/// Home screen: a greeting with the study numbers, the featured item and rows of covers.
 struct LibraryView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var savedWords: SavedWordsStore
-    @Environment(\.openWindow) private var openWindow
+    @EnvironmentObject private var practice: PracticeStore
     @Binding var showLinkSheet: Bool
     @ViewState private var deleteCandidate: LibraryItem?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
+                header
                 if let featured = library.featured {
                     Hero(item: featured, play: play)
                 }
@@ -20,12 +21,10 @@ struct LibraryView: View {
                 row("Baixados do YouTube", library.downloads)
                 row("Filmes e vídeos", library.videos)
                 row("Músicas", library.music)
-                footer
             }
-            .padding(.bottom, 30)
+            .padding(.vertical, 24)
         }
-        .background(Color(red: 0.08, green: 0.08, blue: 0.1))
-        .environment(\.colorScheme, .dark)
+        .scrollIndicators(.never)
         .onAppear { library.refresh() }
         .confirmationDialog(
             "Apagar “\(deleteCandidate?.title ?? "")”?",
@@ -39,47 +38,60 @@ struct LibraryView: View {
         }
     }
 
+    private var header: some View {
+        HStack(alignment: .bottom, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(Self.greeting)
+                    .font(.system(size: 30, weight: .heavy))
+                    .gradientForeground()
+                Text("O que vamos assistir em inglês hoje?")
+                    .foregroundStyle(Theme.textDim)
+            }
+            .fixedSize()
+            Spacer(minLength: 20)
+            StatCard(value: "\(savedWords.list.words.count)", title: "palavras salvas", icon: "bookmark.fill", tint: Theme.indigo) {
+                model.section = .savedWords
+            }
+            StatCard(value: "\(savedWords.list.due().count)", title: "para revisar", icon: "rectangle.on.rectangle.angled.fill",
+                     tint: Theme.orange, highlighted: !savedWords.list.due().isEmpty) {
+                model.section = .review
+            }
+            StatCard(value: practice.history.averageScore.map(String.init) ?? "–", title: "média de pronúncia",
+                     icon: "waveform", tint: Theme.violet) {
+                model.section = .practice
+            }
+        }
+        .padding(.horizontal, 28)
+    }
+
+    private static var greeting: String {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 5..<12: "Bom dia!"
+        case 12..<18: "Boa tarde!"
+        default: "Boa noite!"
+        }
+    }
+
     @ViewBuilder
     private func row(_ title: String, _ items: [LibraryItem]) -> some View {
         if !items.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(title)
-                    .font(.title2.bold())
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 32)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title).font(.system(size: 19, weight: .bold))
+                    Text("\(items.count)").font(.callout.weight(.semibold)).foregroundStyle(Theme.textDim)
+                }
+                .padding(.horizontal, 28)
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 16) {
+                    LazyHStack(alignment: .top, spacing: 18) {
                         ForEach(items) { item in
                             Card(item: item, play: play, remove: remove)
                         }
                     }
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 12)
                 }
             }
         }
-    }
-
-    private var footer: some View {
-        HStack(spacing: 12) {
-            Button("Abrir arquivo…", systemImage: "folder") { FilePicker.openMedia(model) }
-            Button("Baixar do YouTube…", systemImage: "link") { showLinkSheet = true }
-            let due = savedWords.list.due().count
-            if due > 0 {
-                Button("Revisar palavras (\(due))", systemImage: "rectangle.on.rectangle.angled") {
-                    openWindow(id: "review")
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
-            }
-            Spacer()
-            if library.downloadsSize > 0 {
-                Text("Downloads: \(ByteCountFormatter.string(fromByteCount: library.downloadsSize, countStyle: .file))")
-                    .foregroundStyle(.secondary)
-                Button("Mostrar pasta") { NSWorkspace.shared.open(AppFolders.downloads) }
-            }
-        }
-        .padding(.horizontal, 32)
     }
 
     /// Resumes where playback stopped, unless the item was (almost) finished.
@@ -96,6 +108,44 @@ struct LibraryView: View {
     }
 }
 
+/// A number with a label, e.g. "12 palavras salvas"; clicking opens that screen.
+private struct StatCard: View {
+    let value: String
+    let title: String
+    let icon: String
+    let tint: Color
+    var highlighted = false
+    let action: () -> Void
+    @ViewState private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(tint.gradient))
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(value).font(.system(size: 18, weight: .heavy).monospacedDigit())
+                    Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.textDim)
+                }
+                .fixedSize()
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 16)
+            .padding(.vertical, 9)
+            .glassCard(cornerRadius: 14, highlighted: isHovered)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(tint.opacity(highlighted ? 0.6 : 0), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
+}
+
 // MARK: - Featured
 
 private struct Hero: View {
@@ -106,54 +156,49 @@ private struct Hero: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Cover(item: item, showTitle: false)
-                .frame(height: 380)
+                .frame(height: 360)
                 .frame(maxWidth: .infinity)
                 .clipped()
-            LinearGradient(colors: [.clear, Color(red: 0.08, green: 0.08, blue: 0.1)], startPoint: .center, endPoint: .bottom)
-            LinearGradient(colors: [.black.opacity(0.75), .clear], startPoint: .leading, endPoint: .center)
+            LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .center, endPoint: .bottom)
+            LinearGradient(colors: [.black.opacity(0.8), .black.opacity(0.2), .clear], startPoint: .leading, endPoint: .trailing)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text(item.lastOpened == nil ? "NOVO NA BIBLIOTECA" : "ASSISTIDO RECENTEMENTE")
-                    .font(.caption.bold())
-                    .tracking(2)
-                    .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 12) {
+                Chip(text: item.lastOpened == nil ? "NOVO NA BIBLIOTECA" : "ASSISTIDO RECENTEMENTE",
+                     systemImage: item.lastOpened == nil ? "sparkles" : "clock.fill", color: Theme.orange)
                 Text(item.title)
-                    .font(.system(size: 34, weight: .heavy))
+                    .font(.system(size: 36, weight: .heavy))
                     .foregroundStyle(.white)
                     .lineLimit(2)
-                    .frame(maxWidth: 560, alignment: .leading)
-                ItemDetails(item: item)
+                    .frame(maxWidth: 620, alignment: .leading)
+                    .shadow(color: .black.opacity(0.4), radius: 8)
+                HStack(spacing: 8) {
+                    ItemDetails(item: item)
+                    if item.hasTranscript { Chip(text: "Legendas prontas", systemImage: "captions.bubble.fill", color: .white) }
+                }
                 if item.isInProgress, let progress = item.progress {
-                    ProgressView(value: progress)
-                        .tint(.orange)
-                        .frame(width: 260)
+                    GradientProgress(value: progress, height: 5).frame(width: 300)
                 }
                 HStack(spacing: 10) {
                     Button { play(item, false) } label: {
                         Label(item.isInProgress ? "Continuar" : "Assistir", systemImage: "play.fill")
-                            .font(.headline)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 8)
-                            .background(RoundedRectangle(cornerRadius: 6).fill(.white))
-                            .foregroundStyle(.black)
+                            .padding(.horizontal, 6)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PrimaryButtonStyle())
                     if item.isInProgress {
                         Button { play(item, true) } label: {
                             Label("Do início", systemImage: "arrow.counterclockwise")
-                                .font(.headline)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.25)))
-                                .foregroundStyle(.white)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(GlassButtonStyle())
                     }
                 }
                 .padding(.top, 4)
             }
             .padding(32)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Theme.stroke, lineWidth: 1))
+        .shadow(color: .black.opacity(0.5), radius: 30, y: 14)
+        .padding(.horizontal, 28)
     }
 }
 
@@ -165,26 +210,25 @@ private struct Card: View {
     let remove: (LibraryItem) -> Void
     @ViewState private var isHovered = false
 
+    private static let width: CGFloat = 248
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .bottom) {
                 Cover(item: item, showTitle: true)
-                    .frame(width: 256, height: 144)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .frame(width: Self.width, height: Self.width * 9 / 16)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 if item.isInProgress, let progress = item.progress {
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            Rectangle().fill(.white.opacity(0.3))
-                            Rectangle().fill(Color.orange).frame(width: geometry.size.width * progress)
-                        }
-                    }
-                    .frame(height: 4)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
+                    GradientProgress(value: progress, height: 4)
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 10)
                 }
             }
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isHovered ? AnyShapeStyle(Theme.warm) : AnyShapeStyle(Theme.stroke), lineWidth: isHovered ? 2 : 1)
+            )
             .overlay(alignment: .topTrailing) {
                 HStack(spacing: 4) {
                     if item.hasTranscript { Badge(text: "CC", help: "Legendas prontas") }
@@ -196,37 +240,34 @@ private struct Card: View {
                 if isHovered {
                     Button { remove(item) } label: {
                         Image(systemName: item.isDownload ? "trash" : "xmark")
-                            .font(.caption.bold())
-                            .padding(7)
-                            .background(Circle().fill(.black.opacity(0.7)))
-                            .foregroundStyle(.white)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(IconButtonStyle(size: 26))
                     .help(item.isDownload ? "Apagar o vídeo baixado" : "Remover da biblioteca (o arquivo continua no seu Mac)")
                     .padding(8)
                 }
             }
             .overlay {
                 if isHovered {
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 44))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .shadow(radius: 6)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 46, height: 46)
+                        .background(Circle().fill(Theme.brand))
+                        .shadow(color: Theme.violet.opacity(0.6), radius: 12)
                         .allowsHitTesting(false)
                 }
             }
-            .shadow(color: .black.opacity(isHovered ? 0.6 : 0.3), radius: isHovered ? 14 : 6, y: 4)
-            .scaleEffect(isHovered ? 1.06 : 1)
-            .animation(.easeOut(duration: 0.15), value: isHovered)
+            .shadow(color: isHovered ? Theme.violet.opacity(0.35) : .black.opacity(0.35), radius: isHovered ? 18 : 8, y: 6)
+            .offset(y: isHovered ? -4 : 0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isHovered)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
                 ItemDetails(item: item).font(.caption)
             }
-            .frame(width: 256, alignment: .leading)
+            .frame(width: Self.width, alignment: .leading)
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
@@ -276,7 +317,7 @@ private struct ItemDetails: View {
             }
             Text("· \(ByteCountFormatter.string(fromByteCount: item.size, countStyle: .file))")
         }
-        .foregroundStyle(.white.opacity(0.65))
+        .foregroundStyle(.white.opacity(0.6))
     }
 
     static func format(_ seconds: Double) -> String {

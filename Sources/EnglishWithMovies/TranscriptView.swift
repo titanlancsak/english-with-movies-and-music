@@ -17,16 +17,21 @@ struct TranscriptView: View {
     }
 
     private func placeholder(_ text: String) -> some View {
-        Text(text)
-            .multilineTextAlignment(.center)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 12) {
+            Image(systemName: "captions.bubble.fill")
+                .font(.system(size: 34))
+                .gradientForeground(Theme.brand)
+            Text(text)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Theme.textDim)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func lines(_ transcript: Transcript) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(transcript.lines) { line in
                         LineRow(
                             line: line,
@@ -36,8 +41,9 @@ struct TranscriptView: View {
                         .id(line.id)
                     }
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, 14)
             }
+            .scrollIndicators(.never)
             .simultaneousGesture(DragGesture().onChanged { _ in model.followPlayback = false })
             .onScrollWheel { model.followPlayback = false }
             .onChange(of: model.activeLine) { _, line in
@@ -56,8 +62,8 @@ struct TranscriptView: View {
                         model.followPlayback = true
                         if let line = model.activeLine { proxy.scrollTo(line, anchor: .center) }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .padding()
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(16)
                 }
             }
         }
@@ -72,38 +78,38 @@ private struct LineRow: View {
     let isActive: Bool
     let activeWord: Int?
 
+    @ViewState private var isHovered = false
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: 14) {
             VStack(alignment: .trailing, spacing: 6) {
                 Button(timestamp(line.start)) { model.seek(to: line.start) }
                     .buttonStyle(.plain)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(isActive ? Theme.violet : Theme.textDim)
                     .help("Ir para esta fala")
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     if let best = practice.record(for: line, source: model.sourceName)?.best {
-                        Text("\(best)")
-                            .font(.caption2.bold())
-                            .foregroundStyle(scoreColor(best))
-                            .padding(.horizontal, 4)
-                            .background(Capsule().fill(scoreColor(best).opacity(0.18)))
+                        Chip(text: "\(best)", color: scoreColor(best))
                             .help("Sua melhor nota nesta fala")
                     }
-                    Button {
-                        model.pause()
-                        model.practiceLine = line
-                    } label: {
-                        Image(systemName: "mic")
+                    if isActive || isHovered {
+                        Button {
+                            model.pause()
+                            model.practiceLine = line
+                        } label: {
+                            Image(systemName: "mic.fill")
+                        }
+                        .buttonStyle(IconButtonStyle(size: 26, tint: isActive ? Theme.violet : .white))
+                        .help("Praticar a pronúncia desta fala (⌘R na fala atual)")
                     }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                    .help("Praticar a pronúncia desta fala (⌘R na fala atual)")
                 }
+                .frame(height: 26)
             }
-            .frame(width: 64, alignment: .trailing)
+            .frame(width: 70, alignment: .trailing)
 
-            VStack(alignment: .leading, spacing: 4) {
-                FlowLayout(spacing: 5, lineSpacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
+                FlowLayout(spacing: 4, lineSpacing: 6) {
                     ForEach(Array(line.words.enumerated()), id: \.offset) { index, word in
                         WordButton(
                             word: word,
@@ -118,18 +124,28 @@ private struct LineRow: View {
                     TranslatedText(text: line.text)
                         .font(.system(size: isActive ? 16 : 14))
                         .italic()
-                        .foregroundStyle(isActive ? Color.primary.opacity(0.75) : Color.secondary.opacity(0.8))
+                        .foregroundStyle(isActive ? Theme.orange.opacity(0.95) : Theme.textDim)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
-        .padding(.vertical, isActive ? 10 : 4)
-        .padding(.horizontal, 12)
+        .padding(.vertical, isActive ? 14 : 6)
+        .padding(.horizontal, 14)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isActive ? Color.accentColor.opacity(0.12) : .clear)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(isActive
+                      ? AnyShapeStyle(LinearGradient(colors: [Theme.indigo.opacity(0.22), Theme.violet.opacity(0.12)],
+                                                     startPoint: .leading, endPoint: .trailing))
+                      : AnyShapeStyle(isHovered ? Theme.surface : Color.clear))
         )
-        .padding(.horizontal, 8)
+        .overlay(alignment: .leading) {
+            if isActive {
+                Capsule().fill(Theme.warm).frame(width: 3).padding(.vertical, 12)
+            }
+        }
+        .padding(.horizontal, 10)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.2), value: isActive)
     }
 
     private func timestamp(_ seconds: Double) -> String {
@@ -144,6 +160,7 @@ private struct WordButton: View {
     @EnvironmentObject private var savedWords: SavedWordsStore
     @EnvironmentObject private var translator: Translator
     @ViewState private var showDefinition = false
+    @ViewState private var isHovered = false
     let word: TimedWord
     let line: TranscriptLine
     let isLineActive: Bool
@@ -152,14 +169,22 @@ private struct WordButton: View {
 
     var body: some View {
         Text(word.text)
-            .underline(savedWords.contains(word.text), color: .orange)
-            .font(.system(size: isLineActive ? 20 : 16, weight: isLineActive ? .bold : .regular))
+            .underline(savedWords.contains(word.text), color: Theme.orange)
+            .font(.system(size: isLineActive ? 22 : 16, weight: isLineActive ? .bold : .regular))
             .foregroundStyle(color)
-            .padding(.horizontal, 2)
+            .padding(.horizontal, isCurrent ? 6 : 2)
+            .padding(.vertical, isCurrent ? 1 : 0)
             .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(isCurrent ? Color.accentColor.opacity(0.3) : .clear)
+                Capsule()
+                    .fill(Theme.brand)
+                    .shadow(color: Theme.violet.opacity(0.6), radius: 8)
+                    .opacity(isCurrent ? 1 : 0)
             )
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(isHovered && !isCurrent ? Color.white.opacity(0.1) : .clear)
+            )
+            .animation(.easeOut(duration: 0.12), value: isCurrent)
             .contentShape(Rectangle())
             .onTapGesture {
                 guard !WordNormalizer.lookupKey(word.text).isEmpty else { return }
@@ -167,6 +192,7 @@ private struct WordButton: View {
                 showDefinition = true
             }
             .onHover { inside in
+                isHovered = inside
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
             .popover(isPresented: $showDefinition, arrowEdge: .top) {
@@ -178,8 +204,8 @@ private struct WordButton: View {
     }
 
     private var color: Color {
-        if !isLineActive { return .secondary }
-        return isSpoken ? .primary : .primary.opacity(0.55)
+        if !isLineActive { return .white.opacity(0.6) }
+        return isSpoken ? .white : .white.opacity(0.42)
     }
 }
 

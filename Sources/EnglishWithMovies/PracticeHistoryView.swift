@@ -1,57 +1,76 @@
 import LinguaCore
 import SwiftUI
 
-/// Window with every practiced sentence and its scores.
+/// Every practiced sentence and its scores.
 struct PracticeHistoryView: View {
     @EnvironmentObject private var practice: PracticeStore
 
     var body: some View {
         let history = practice.history
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                SummaryCard(title: "Frases praticadas", value: "\(history.records.count)")
-                SummaryCard(title: "Tentativas", value: "\(history.attemptCount)")
-                SummaryCard(title: "Média atual", value: history.averageScore.map(String.init) ?? "–",
-                            color: history.averageScore.map(scoreColor) ?? .secondary)
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pronúncia")
+                    .font(.system(size: 30, weight: .heavy))
+                    .gradientForeground()
+                Text("Clique no 🎤 ao lado de uma fala, ou use ⌘R para praticar a fala atual.")
+                    .foregroundStyle(Theme.textDim)
             }
-            .padding()
+            .padding(.horizontal, 28)
+
+            HStack(spacing: 14) {
+                SummaryCard(title: "Frases praticadas", value: "\(history.records.count)", icon: "text.bubble.fill", tint: Theme.indigo)
+                SummaryCard(title: "Tentativas", value: "\(history.attemptCount)", icon: "mic.fill", tint: Theme.violet)
+                SummaryCard(title: "Média atual", value: history.averageScore.map(String.init) ?? "–", icon: "chart.line.uptrend.xyaxis",
+                            tint: history.averageScore.map(scoreColor) ?? Theme.orange)
+            }
+            .padding(.horizontal, 28)
 
             if history.records.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "mic.badge.plus")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.secondary)
-                    Text("Nenhuma fala praticada ainda").font(.title3.bold())
-                    Text("Clique no 🎤 ao lado de uma fala, ou use ⌘R para praticar a fala atual.")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                EmptyState(icon: "mic.badge.plus", title: "Nenhuma fala praticada ainda",
+                           text: "Abra um filme, escolha uma fala e repita no microfone para receber uma nota.")
             } else {
-                List(history.recent) { record in
-                    RecordRow(record: record)
-                        .contextMenu {
-                            Button("Apagar histórico desta frase", role: .destructive) { practice.remove(record.id) }
+                ScrollView {
+                    LazyVStack(spacing: 10) {
+                        ForEach(history.recent) { record in
+                            RecordRow(record: record)
+                                .contextMenu {
+                                    Button("Apagar histórico desta frase", role: .destructive) { practice.remove(record.id) }
+                                }
                         }
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 24)
                 }
+                .scrollIndicators(.never)
             }
         }
-        .frame(minWidth: 520, minHeight: 420)
+        .padding(.top, 24)
     }
 }
 
 private struct SummaryCard: View {
     let title: String
     let value: String
-    var color: Color = .primary
+    let icon: String
+    let tint: Color
 
     var body: some View {
-        VStack(spacing: 4) {
-            Text(value).font(.title.bold()).foregroundStyle(color).monospacedDigit()
-            Text(title).font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(tint.gradient))
+                .shadow(color: tint.opacity(0.5), radius: 10)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(value).font(.system(size: 26, weight: .heavy).monospacedDigit())
+                Text(title).font(.caption).foregroundStyle(Theme.textDim)
+            }
+            Spacer(minLength: 0)
         }
+        .padding(16)
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
+        .glassCard()
     }
 }
 
@@ -59,29 +78,30 @@ private struct RecordRow: View {
     let record: PracticeRecord
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            ScoreRing(score: record.last?.score ?? 0, size: 40)
+        HStack(alignment: .center, spacing: 16) {
+            ScoreRing(score: record.last?.score ?? 0, size: 46)
             VStack(alignment: .leading, spacing: 4) {
-                Text(record.sentence).lineLimit(2)
+                Text(record.sentence).font(.system(size: 14, weight: .semibold)).lineLimit(2)
                 HStack(spacing: 6) {
                     if let source = record.source {
                         Text("\(source) · \(formatTime(record.lineStart))").lineLimit(1)
                     }
                     if let date = record.last?.date {
-                        Text(date, format: .relative(presentation: .named))
+                        Text("· ") + Text(date, format: .relative(presentation: .named))
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.textDim)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                Text("melhor \(record.best)").font(.caption.bold()).foregroundStyle(scoreColor(record.best))
+            VStack(alignment: .trailing, spacing: 6) {
+                Chip(text: "melhor \(record.best)", systemImage: "trophy.fill", color: scoreColor(record.best))
                 Sparkline(scores: record.attempts.suffix(10).map(\.score))
-                Text("\(record.attempts.count)× ").font(.caption2).foregroundStyle(.secondary)
+                Text("\(record.attempts.count) tentativa\(record.attempts.count == 1 ? "" : "s")").font(.caption2).foregroundStyle(Theme.textDim)
             }
         }
-        .padding(.vertical, 4)
+        .padding(14)
+        .glassCard()
     }
 }
 
@@ -92,8 +112,8 @@ private struct Sparkline: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 2) {
             ForEach(Array(scores.enumerated()), id: \.offset) { _, score in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(scoreColor(score))
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(scoreColor(score).gradient)
                     .frame(width: 5, height: max(2, CGFloat(score) / 100 * 22))
             }
         }

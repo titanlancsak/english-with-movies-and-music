@@ -25,23 +25,32 @@ struct PracticeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Pratique a fala").font(.title2.bold())
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    SectionLabel(text: "Treino de pronúncia")
+                    Text("Pratique a fala")
+                        .font(.system(size: 26, weight: .heavy))
+                        .gradientForeground()
+                }
                 Spacer()
                 if let source = model.sourceName {
-                    Text("\(source) · \(formatTime(line.start))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Chip(text: "\(source) · \(formatTime(line.start))", systemImage: "film", color: Theme.textDim)
                         .lineLimit(1)
+                        .frame(maxWidth: 260, alignment: .trailing)
                 }
             }
 
             Text(line.text)
-                .font(.title3)
+                .font(.system(size: 21, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(12)
+                .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor.opacity(0.1)))
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(LinearGradient(colors: [Theme.indigo.opacity(0.25), Theme.violet.opacity(0.12)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                )
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.stroke))
                 .textSelection(.enabled)
 
             controls
@@ -59,42 +68,43 @@ struct PracticeView: View {
             HStack {
                 Spacer()
                 Button("Fechar") { dismiss() }
+                    .buttonStyle(GlassButtonStyle())
                     .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(20)
-        .frame(width: 560)
+        .padding(24)
+        .frame(width: 600)
+        .background(AuroraBackground())
+        .environment(\.colorScheme, .dark)
         .onDisappear(perform: cleanUp)
     }
 
     private var controls: some View {
-        HStack(spacing: 12) {
-            Button("Ouvir o personagem", systemImage: "play.circle") { model.playSegment(line) }
+        HStack(spacing: 10) {
+            Button("Ouvir o personagem", systemImage: "play.fill") { model.playSegment(line) }
+                .buttonStyle(GlassButtonStyle())
                 .disabled(recorder.isRecording || model.player == nil)
 
             if recorder.isRecording {
-                Button("Parar", systemImage: "stop.circle.fill") { recorder.stop() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
+                Button("Parar", systemImage: "stop.fill") { recorder.stop() }
+                    .buttonStyle(PrimaryButtonStyle(gradient: LinearGradient(colors: [.red, Theme.pink], startPoint: .leading, endPoint: .trailing)))
                     .keyboardShortcut(.defaultAction)
-                ProgressView(value: recorder.level)
-                    .frame(width: 120)
-                    .tint(.red)
-                Text("Fale agora…").foregroundStyle(.secondary)
+                LevelMeter(level: recorder.level)
+                Text("Fale agora…").foregroundStyle(Theme.textDim)
             } else {
-                Button(phase == .idle ? "Gravar" : "Gravar de novo", systemImage: "mic.circle.fill") {
+                Button(phase == .idle ? "Gravar" : "Gravar de novo", systemImage: "mic.fill") {
                     Task { await startRecording() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.defaultAction)
                 .disabled(phase == .analyzing)
 
                 if recording != nil, phase != .analyzing {
                     Button("Ouvir minha voz", systemImage: "waveform") { playRecording() }
+                        .buttonStyle(GlassButtonStyle())
                 }
             }
         }
-        .controlSize(.large)
     }
 
     @ViewBuilder
@@ -181,10 +191,10 @@ private struct ResultView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 20) {
-                ScoreRing(score: result.score, size: 96)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(scoreLabel(result.score)).font(.title3.bold())
+            HStack(spacing: 24) {
+                ScoreRing(score: result.score, size: 110)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(scoreLabel(result.score)).font(.system(size: 22, weight: .heavy))
                     Metric(title: "Precisão", value: result.accuracy)
                     Metric(title: "Fluência", value: result.fluency)
                     Metric(title: "Completude", value: result.completeness)
@@ -193,6 +203,9 @@ private struct ResultView: View {
                     }
                 }
             }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassCard()
 
             FlowLayout(spacing: 6, lineSpacing: 6) {
                 ForEach(Array(result.words.enumerated()), id: \.offset) { _, word in
@@ -200,9 +213,10 @@ private struct ResultView: View {
                         .font(.title3.weight(.semibold))
                         .strikethrough(word.status == .missing)
                         .foregroundStyle(color(for: word.status))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(color(for: word.status).opacity(0.15)))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(color(for: word.status).opacity(0.16)))
+                        .overlay(Capsule().strokeBorder(color(for: word.status).opacity(0.35)))
                         .help(help(for: word))
                 }
             }
@@ -225,8 +239,13 @@ private struct ResultView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(result.tips, id: \.self) { tip in
-                    Label(tip, systemImage: "lightbulb")
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "lightbulb.fill").foregroundStyle(Theme.orange)
+                        Text(tip).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.orange.opacity(0.1)))
                 }
             }
 
@@ -381,10 +400,10 @@ private struct Metric: View {
     let value: Double
 
     var body: some View {
-        HStack {
-            Text(title).frame(width: 90, alignment: .leading)
-            ProgressView(value: value).frame(width: 160)
-            Text("\(Int((value * 100).rounded()))").monospacedDigit().frame(width: 32, alignment: .trailing)
+        HStack(spacing: 10) {
+            Text(title).foregroundStyle(Theme.textDim).frame(width: 84, alignment: .leading)
+            GradientProgress(value: value).frame(width: 170)
+            Text("\(Int((value * 100).rounded()))").fontWeight(.semibold).monospacedDigit().frame(width: 30, alignment: .trailing)
         }
         .font(.callout)
     }
@@ -429,12 +448,17 @@ struct ScoreRing: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(Color.secondary.opacity(0.2), lineWidth: size * 0.1)
+            Circle().stroke(Color.white.opacity(0.08), lineWidth: size * 0.1)
             Circle()
                 .trim(from: 0, to: CGFloat(score) / 100)
-                .stroke(scoreColor(score), style: StrokeStyle(lineWidth: size * 0.1, lineCap: .round))
+                .stroke(
+                    AngularGradient(colors: [scoreColor(score).opacity(0.6), scoreColor(score)], center: .center,
+                                    startAngle: .degrees(0), endAngle: .degrees(360 * Double(score) / 100)),
+                    style: StrokeStyle(lineWidth: size * 0.1, lineCap: .round)
+                )
                 .rotationEffect(.degrees(-90))
-            Text("\(score)").font(.system(size: size * 0.34, weight: .bold)).monospacedDigit()
+                .shadow(color: scoreColor(score).opacity(0.55), radius: size * 0.08)
+            Text("\(score)").font(.system(size: size * 0.34, weight: .heavy)).monospacedDigit()
         }
         .frame(width: size, height: size)
         .padding(size * 0.05)
@@ -443,9 +467,26 @@ struct ScoreRing: View {
 
 func scoreColor(_ score: Int) -> Color {
     switch score {
-    case 80...: .green
-    case 60..<80: .orange
-    default: .red
+    case 80...: Color(red: 0.204, green: 0.827, blue: 0.600)   // #34D399
+    case 60..<80: Color(red: 0.984, green: 0.749, blue: 0.141) // #FBBF24
+    default: Color(red: 0.973, green: 0.443, blue: 0.443)      // #F87171
+    }
+}
+
+/// Live microphone level while recording.
+private struct LevelMeter: View {
+    let level: Double
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 3) {
+            ForEach(0..<16, id: \.self) { index in
+                let threshold = Double(index) / 16
+                Capsule()
+                    .fill(level > threshold ? AnyShapeStyle(Theme.warm) : AnyShapeStyle(Color.white.opacity(0.12)))
+                    .frame(width: 4, height: 6 + CGFloat(sin(Double(index) * 0.7) + 1) * 7)
+            }
+        }
+        .animation(.easeOut(duration: 0.1), value: level)
     }
 }
 

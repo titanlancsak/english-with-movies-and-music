@@ -25,11 +25,16 @@ struct ReviewView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Picker("Modo", selection: $mode) {
-                ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Revisão")
+                    .font(.system(size: 30, weight: .heavy))
+                    .gradientForeground()
+                Text("Cartões com repetição espaçada: quem você erra volta logo, quem você sabe volta depois.")
+                    .foregroundStyle(Theme.textDim)
+                    .lineLimit(2)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            ModePicker(mode: $mode)
             .onChange(of: mode) { _, mode in
                 UserDefaults.standard.set(mode.rawValue, forKey: "reviewMode")
                 isFlipped = false
@@ -46,8 +51,10 @@ struct ReviewView: View {
                 startScreen
             }
         }
-        .padding(24)
-        .frame(minWidth: 520, minHeight: 560)
+        .frame(maxWidth: 680)
+        .padding(.horizontal, 28)
+        .padding(.vertical, 24)
+        .frame(maxWidth: .infinity)
         .onAppear { if !isRunning { startSession(all: false) } }
     }
 
@@ -89,9 +96,9 @@ struct ReviewView: View {
 
     private var progress: some View {
         let done = sessionSize - Set(queue).count
-        return VStack(spacing: 4) {
-            ProgressView(value: Double(done), total: Double(max(sessionSize, 1)))
-            Text("\(done) de \(sessionSize) palavras").font(.caption).foregroundStyle(.secondary)
+        return HStack(spacing: 12) {
+            GradientProgress(value: Double(done) / Double(max(sessionSize, 1)))
+            Text("\(done)/\(sessionSize)").font(.caption.weight(.semibold).monospacedDigit()).foregroundStyle(Theme.textDim)
         }
     }
 
@@ -103,13 +110,19 @@ struct ReviewView: View {
                 .opacity(isFlipped ? 1 : 0)
                 .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
         }
-        .padding(24)
+        .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color.accentColor.opacity(0.08))
-                .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(LinearGradient(colors: [Theme.indigo.opacity(0.28), Theme.violet.opacity(0.14), Color.white.opacity(0.03)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [Theme.violet.opacity(0.7), Theme.stroke, Theme.orange.opacity(0.4)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.2)
+        )
+        .shadow(color: Theme.violet.opacity(0.3), radius: 30, y: 12)
         .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
         .animation(.easeInOut(duration: 0.35), value: isFlipped)
         .contentShape(Rectangle())
@@ -121,7 +134,7 @@ struct ReviewView: View {
         VStack(spacing: 16) {
             switch mode {
             case .englishToPortuguese:
-                Text(word.word).font(.system(size: 44, weight: .bold))
+                Text(word.word).font(.system(size: 52, weight: .heavy)).gradientForeground()
                 if let phonetic = word.phonetic { Text(phonetic).foregroundStyle(.secondary) }
                 speakButton(word)
                 if let context = word.context {
@@ -144,9 +157,9 @@ struct ReviewView: View {
                 Text("Como se diz em inglês?").font(.headline).foregroundStyle(.secondary)
             case .listening:
                 Button { Pronouncer.shared.say(word.word) } label: {
-                    Image(systemName: "speaker.wave.3.fill").font(.system(size: 56))
+                    Image(systemName: "speaker.wave.3.fill").font(.system(size: 56)).gradientForeground(Theme.brand)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .help("Ouvir de novo")
                 Text("Que palavra é essa? O que significa?").font(.headline).foregroundStyle(.secondary)
             }
@@ -167,8 +180,8 @@ struct ReviewView: View {
                     TranslatedText(text: word.word)
                 }
             }
-            .font(.title2.weight(.semibold))
-            .foregroundStyle(.orange)
+            .font(.title2.weight(.bold))
+            .foregroundStyle(Theme.orange)
 
             if let definition = word.definition {
                 VStack(spacing: 2) {
@@ -188,21 +201,18 @@ struct ReviewView: View {
                 if let path = word.sourcePath, FileManager.default.fileExists(atPath: path) {
                     Button("Ver no \(word.sourceName ?? "filme")", systemImage: "film") {
                         model.open(URL(fileURLWithPath: path), at: word.sourceTime ?? 0)
-                        NSApp.windows.first { $0.identifier?.rawValue != "review" && $0.canBecomeMain }?
-                            .makeKeyAndOrderFront(nil)
                     }
-                    .controlSize(.small)
+                    .buttonStyle(GlassButtonStyle())
                 }
             }
         }
-        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func speakButton(_ word: SavedWord) -> some View {
         Button { Pronouncer.shared.say(word.word) } label: {
             Image(systemName: "speaker.wave.2.fill")
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(IconButtonStyle(size: 32))
         .help("Ouvir a pronúncia")
     }
 
@@ -222,25 +232,23 @@ struct ReviewView: View {
                 ForEach(ReviewGrade.allCases, id: \.self) { grade in
                     Button { answer(grade) } label: {
                         VStack(spacing: 2) {
-                            Text(grade.title).font(.headline)
-                            Text(ReviewScheduler.describeNext(word.review, grade: grade)).font(.caption)
+                            Text(grade.title).font(.system(size: 14, weight: .bold))
+                            Text(ReviewScheduler.describeNext(word.review, grade: grade)).font(.caption).opacity(0.8)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(color(grade))
+                    .buttonStyle(GradeButtonStyle(color: color(grade), key: grade.rawValue))
                     .keyboardShortcut(KeyEquivalent(Character(String(grade.rawValue))), modifiers: [])
                     .help("Tecla \(grade.rawValue)")
                 }
             }
-            .controlSize(.large)
         } else {
             Button { isFlipped = true } label: {
-                Text("Mostrar resposta").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
+                Label("Mostrar resposta", systemImage: "arrow.2.squarepath")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut(.space, modifiers: [])
             .help("Barra de espaço")
         }
@@ -248,25 +256,26 @@ struct ReviewView: View {
 
     private func color(_ grade: ReviewGrade) -> Color {
         switch grade {
-        case .again: .red
-        case .hard: .orange
-        case .good: .green
-        case .easy: .blue
+        case .again: scoreColor(0)
+        case .hard: scoreColor(70)
+        case .good: scoreColor(100)
+        case .easy: Color(red: 0.376, green: 0.647, blue: 0.980)   // #60A5FA
         }
     }
 
     private var finished: some View {
         VStack(spacing: 14) {
-            Image(systemName: "checkmark.seal.fill").font(.system(size: 54)).foregroundStyle(.green)
-            Text("Revisão concluída!").font(.title.bold())
+            Image(systemName: "checkmark.seal.fill").font(.system(size: 54)).gradientForeground(Theme.brand)
+            Text("Revisão concluída!").font(.system(size: 28, weight: .heavy))
             Text("Você revisou \(reviewed) cartões e lembrou de \(remembered) (\(reviewed > 0 ? remembered * 100 / reviewed : 0)%).")
             stats
             HStack {
                 if !store.list.due().isEmpty {
                     Button("Continuar revisando (\(store.list.due().count))") { startSession(all: false) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(PrimaryButtonStyle())
                 }
-                Button("Fechar") { NSApp.keyWindow?.close() }
+                Button("Voltar para a biblioteca") { model.section = .library }
+                    .buttonStyle(GlassButtonStyle())
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -282,10 +291,11 @@ struct ReviewView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             } else {
-                Image(systemName: "checkmark.circle.fill").font(.system(size: 54)).foregroundStyle(.green)
-                Text("Tudo em dia!").font(.title.bold())
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 54)).gradientForeground(Theme.brand)
+                Text("Tudo em dia!").font(.system(size: 28, weight: .heavy))
                 stats
                 Button("Revisar todas mesmo assim") { startSession(all: true) }
+                    .buttonStyle(GlassButtonStyle())
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -300,5 +310,50 @@ struct ReviewView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// The review modes as glass capsules; the selected one is filled with the brand gradient.
+private struct ModePicker: View {
+    @Binding var mode: ReviewView.Mode
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(ReviewView.Mode.allCases) { option in
+                Button { mode = option } label: {
+                    Text(option.rawValue)
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .frame(maxWidth: .infinity)
+                        .foregroundStyle(mode == option ? .white : Theme.textDim)
+                        .background(Capsule().fill(mode == option ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(Color.clear)))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(Capsule().fill(Theme.surface))
+        .overlay(Capsule().strokeBorder(Theme.stroke))
+    }
+}
+
+/// An answer button tinted by how well the word was remembered, with its keyboard key.
+private struct GradeButtonStyle: ButtonStyle {
+    let color: Color
+    let key: Int
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.white)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 6)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(color.opacity(configuration.isPressed ? 0.45 : 0.25)))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(color.opacity(0.6)))
+            .overlay(alignment: .topTrailing) {
+                Text("\(key)").font(.system(size: 9, weight: .bold)).foregroundStyle(color).padding(6)
+            }
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
     }
 }

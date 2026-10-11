@@ -12,6 +12,12 @@ final class AppModel: ObservableObject {
         case failed(String)
     }
 
+    /// The screens in the sidebar.
+    enum Section: Hashable {
+        case library, player, savedWords, review, practice
+    }
+
+    @Published var section: Section = .library
     @Published private(set) var status: Status = .idle
     @Published private(set) var mediaURL: URL?
     @Published private(set) var hasVideo = false
@@ -63,6 +69,7 @@ final class AppModel: ObservableObject {
             importSubtitles(url)
             return
         }
+        section = .player
         if let time, player != nil, url.standardizedFileURL == mediaURL?.standardizedFileURL {
             seek(to: time)
             player?.play()
@@ -159,6 +166,7 @@ final class AppModel: ObservableObject {
         transcript = nil
         hasVideo = false
         status = .idle
+        section = .library
         library.refresh()
     }
 
@@ -345,8 +353,15 @@ final class AppModel: ObservableObject {
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             MainActor.assumeIsolated { self?.updateActive(time.seconds) }
         }
-        player.play()
+        // `--preview` (for screenshots): open silent and paused.
+        if Self.isPreview {
+            player.isMuted = true
+        } else {
+            player.play()
+        }
     }
+
+    static let isPreview = CommandLine.arguments.contains("--preview")
 
     private func tearDownPlayer() {
         stopSegment()

@@ -20,7 +20,7 @@ struct EnglishWithMoviesApp: App {
                 .environmentObject(practice)
                 .environmentObject(phonemes)
                 .modifier(TranslationHost(translator: translator))
-                .frame(minWidth: 820, minHeight: 620)
+                .frame(minWidth: 960, minHeight: 640)
                 .onAppear { delegate.model = model }
         }
         .commands {
@@ -37,34 +37,22 @@ struct EnglishWithMoviesApp: App {
                     .keyboardShortcut("r")
                     .disabled(model.transcript == nil)
             }
-            CommandGroup(after: .windowArrangement) {
-                OpenSavedWordsButton()
-                OpenReviewButton()
-                OpenPracticeHistoryButton()
+            CommandMenu("Ir") {
+                Button("Biblioteca") { model.section = .library }
+                    .keyboardShortcut("1")
+                Button("Assistindo agora") { model.section = .player }
+                    .keyboardShortcut("2")
+                    .disabled(model.mediaURL == nil)
+                Divider()
+                Button("Palavras salvas") { model.section = .savedWords }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                Button("Revisar palavras") { model.section = .review }
+                    .keyboardShortcut("r", modifiers: [.command, .shift])
+                Button("Histórico de pronúncia") { model.section = .practice }
+                    .keyboardShortcut("h", modifiers: [.command, .shift])
             }
         }
-
-        Window("Palavras salvas", id: "saved-words") {
-            SavedWordsView()
-                .environmentObject(model)
-                .environmentObject(savedWords)
-                .environmentObject(translator)
-        }
-        .defaultSize(width: 560, height: 640)
-
-        Window("Revisão de palavras", id: "review") {
-            ReviewView()
-                .environmentObject(model)
-                .environmentObject(savedWords)
-                .environmentObject(translator)
-        }
-        .defaultSize(width: 580, height: 640)
-
-        Window("Histórico de pronúncia", id: "practice-history") {
-            PracticeHistoryView()
-                .environmentObject(practice)
-        }
-        .defaultSize(width: 600, height: 620)
+        .defaultSize(width: 1280, height: 820)
     }
 }
 
@@ -78,7 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func handle(_ url: URL) {
-        if url.isFileURL { model?.open(url) } else { model?.download(from: url.absoluteString) }
+        // `--at=SECONDS` on the command line starts there.
+        let start = CommandLine.arguments.first { $0.hasPrefix("--at=") }.flatMap { Double($0.dropFirst(5)) }
+        if url.isFileURL { model?.open(url, at: start) } else { model?.download(from: url.absoluteString) }
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -93,7 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        // A plain executable (swift run) does not come to the front by itself; a .app does
+        // (and `open -g` keeps it in the background).
+        if Bundle.main.bundleURL.pathExtension != "app" {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
     }
 
     /// Saves where playback stopped and removes pieces of unfinished downloads.
@@ -114,36 +108,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
-}
-
-/// Menu item (⇧⌘S) that opens the saved words window.
-private struct OpenSavedWordsButton: View {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("Palavras salvas") { openWindow(id: "saved-words") }
-            .keyboardShortcut("s", modifiers: [.command, .shift])
-    }
-}
-
-/// Menu item (⇧⌘R) that opens the flashcard review.
-private struct OpenReviewButton: View {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("Revisar palavras") { openWindow(id: "review") }
-            .keyboardShortcut("r", modifiers: [.command, .shift])
-    }
-}
-
-/// Menu item (⇧⌘H) that opens the pronunciation history window.
-private struct OpenPracticeHistoryButton: View {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("Histórico de pronúncia") { openWindow(id: "practice-history") }
-            .keyboardShortcut("h", modifiers: [.command, .shift])
-    }
 }
 
 enum FilePicker {

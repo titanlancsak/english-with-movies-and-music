@@ -17,31 +17,40 @@ struct WordPopover: View {
     @ViewState private var wordTranslation: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             header
-            Divider()
             if isLoading {
-                ProgressView().frame(maxWidth: .infinity)
+                ProgressView().controlSize(.small).frame(maxWidth: .infinity)
             } else if let entry {
                 senses(entry)
             } else {
                 Text("Não encontrei esta palavra no dicionário.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.textDim)
             }
             portuguese
             examples
         }
-        .padding(16)
-        .frame(width: 380)
+        .padding(20)
+        .frame(width: 400)
+        .background(
+            ZStack(alignment: .topLeading) {
+                Theme.background.opacity(0.6)
+                Circle().fill(Theme.violet.opacity(0.35)).frame(width: 220).blur(radius: 70).offset(x: -60, y: -90)
+            }
+        )
+        .environment(\.colorScheme, .dark)
         .task { await load() }
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(entry?.word ?? WordNormalizer.lookupKey(word))
-                .font(.title2.bold())
-            if let phonetic = entry?.phonetic {
-                Text(phonetic).foregroundStyle(.secondary)
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry?.word ?? WordNormalizer.lookupKey(word))
+                    .font(.system(size: 30, weight: .heavy))
+                    .gradientForeground()
+                if let phonetic = entry?.phonetic {
+                    Text(phonetic).font(.callout).foregroundStyle(Theme.textDim)
+                }
             }
             Spacer()
             Button {
@@ -49,15 +58,14 @@ struct WordPopover: View {
             } label: {
                 Image(systemName: "speaker.wave.2.fill")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(IconButtonStyle(size: 34))
             .help("Ouvir a pronúncia")
 
             let isSaved = savedWords.contains(word)
             Button(action: toggleSaved) {
                 Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(isSaved ? Color.orange : Color.primary)
+            .buttonStyle(IconButtonStyle(size: 34, tint: isSaved ? Theme.orange : .white))
             .disabled(isLoading)
             .help(isSaved ? "Remover das palavras salvas" : "Salvar palavra")
         }
@@ -82,12 +90,10 @@ struct WordPopover: View {
     }
 
     private func senses(_ entry: DictionaryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(entry.senses.enumerated()), id: \.offset) { _, sense in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(sense.partOfSpeech)
-                        .font(.caption.italic())
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Chip(text: sense.partOfSpeech, color: Theme.violet)
                     Text(sense.definition)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -106,20 +112,26 @@ struct WordPopover: View {
             : []
 
         if !isLoading, !fromDictionary.isEmpty || !fromMedia.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Exemplos").font(.headline)
+            VStack(alignment: .leading, spacing: 8) {
+                SectionLabel(text: "Exemplos")
                 ForEach(fromDictionary, id: \.self) { example in
-                    Label(example, systemImage: "text.quote")
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .top, spacing: 8) {
+                        Capsule().fill(Theme.brand).frame(width: 3)
+                        Text(example).fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 ForEach(fromMedia) { line in
                     Button {
                         model.seek(to: line.start)
                         model.player?.play()
                     } label: {
-                        Label(line.text, systemImage: model.hasVideo ? "film" : "music.note")
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.leading)
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: model.hasVideo ? "play.rectangle.fill" : "music.note")
+                                .foregroundStyle(Theme.orange)
+                            Text(line.text)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.leading)
+                        }
                     }
                     .buttonStyle(.plain)
                     .help("Ouvir este trecho")
@@ -132,19 +144,20 @@ struct WordPopover: View {
     @ViewBuilder
     private var portuguese: some View {
         if translator.isSupportedOS {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Em português").font(.headline)
-                HStack(alignment: .firstTextBaseline) {
-                    Text(WordNormalizer.lookupKey(word)).foregroundStyle(.secondary)
-                    Image(systemName: "arrow.right").font(.caption).foregroundStyle(.secondary)
-                    Text(wordTranslation ?? "traduzindo…").bold()
+            VStack(alignment: .leading, spacing: 8) {
+                SectionLabel(text: "Em português")
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(WordNormalizer.lookupKey(word)).foregroundStyle(Theme.textDim)
+                    Image(systemName: "arrow.right").font(.caption).foregroundStyle(Theme.textDim)
+                    Text(wordTranslation ?? "traduzindo…")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.orange)
                 }
-                Label {
-                    TranslatedText(text: line.text).fixedSize(horizontal: false, vertical: true)
-                } icon: {
-                    Image(systemName: "character.bubble")
-                }
-                .font(.callout)
+                TranslatedText(text: line.text)
+                    .italic()
+                    .foregroundStyle(.white.opacity(0.75))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .font(.callout)
                 if let problem = translator.problem {
                     Text(problem).font(.caption).foregroundStyle(.orange)
                 }
@@ -175,6 +188,7 @@ final class Pronouncer {
     private let synthesizer = AVSpeechSynthesizer()
 
     func say(_ text: String) {
+        guard !AppModel.isPreview else { return }   // screenshots stay silent
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
         utterance.rate = 0.42
