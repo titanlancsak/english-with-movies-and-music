@@ -75,7 +75,7 @@ if [ ! -f "$OUT/libffmpeg.so" ] || [ ! -f "$OUT/libffprobe.so" ]; then
         --enable-parser=aac,mpegaudio,opus,vorbis,flac,ac3,h264,hevc,vp8,vp9,mpeg4video \
         --enable-encoder=pcm_s16le,mjpeg \
         --enable-muxer=wav,image2,mjpeg \
-        --enable-filter=aresample,aformat,anull,scale,format,null,copy \
+        --enable-filter=aresample,aformat,anull,scale,format,null,copy,crop,cropdetect \
         --enable-swresample --enable-swscale > "$WORK/ffmpeg-configure.log"
     make -j "$JOBS" > "$WORK/ffmpeg-build.log" 2>&1
     cp ffmpeg "$OUT/libffmpeg.so"

@@ -15,7 +15,7 @@ class LibraryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-      listenable: Listenable.merge([app.library, app.savedWords, app.practice]), builder: (context, _) => _build(context));
+      listenable: Listenable.merge([app.library, app.savedWords, app.practice, app.study]), builder: (context, _) => _build(context));
 
   Widget _build(BuildContext context) {
     final library = app.library;
@@ -65,6 +65,7 @@ class _Header extends StatelessWidget {
     final due = words.due().length;
     final average = app.practice.history.averageScore;
     final stats = [
+      const _GoalCard(),
       _StatCard('${words.words.length}', 'palavras salvas', Icons.bookmark_rounded, AppColors.indigo, () => app.showSection(AppSection.savedWords)),
       _StatCard('$due', 'para revisar', Icons.style_rounded, AppColors.orange, () => app.showSection(AppSection.review), highlighted: due > 0),
       _StatCard(average?.toString() ?? '–', 'média de pronúncia', Icons.graphic_eq_rounded, AppColors.violet,
@@ -88,6 +89,54 @@ class _Header extends StatelessWidget {
                 Expanded(child: title),
                 for (final card in stats) Padding(padding: const EdgeInsets.only(left: 12), child: card),
               ]),
+      ),
+    );
+  }
+}
+
+/// The daily goal: days in a row and today's progress; tapping changes the goal.
+class _GoalCard extends StatelessWidget {
+  const _GoalCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final log = app.study.log;
+    final progress = log.todayProgress();
+    final streak = log.streak();
+    return Tooltip(
+      message: 'Sequência de dias em que você atingiu a meta. Assistir, revisar e praticar contam. Toque para mudar a meta.',
+      child: PopupMenuButton<int>(
+        tooltip: '',
+        onSelected: (minutes) => app.study.goalMinutes = minutes,
+        itemBuilder: (context) => [
+          const PopupMenuItem(enabled: false, child: Text('Meta diária')),
+          for (final minutes in const [5, 10, 15, 20, 30, 45, 60])
+            CheckedPopupMenuItem(value: minutes, checked: minutes == app.study.goalMinutes, child: Text('$minutes min por dia')),
+        ],
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 9, 16, 9),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: progress >= 1 ? AppColors.orange.withValues(alpha: 0.6) : AppColors.stroke),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: Stack(alignment: Alignment.center, children: [
+                CircularProgressIndicator(value: progress, strokeWidth: 3.5, color: AppColors.orange, backgroundColor: Colors.white10),
+                Icon(Icons.local_fire_department_rounded, size: 17, color: streak > 0 ? AppColors.orange : AppColors.textDim),
+              ]),
+            ),
+            const SizedBox(width: 10),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(streak == 1 ? '1 dia' : '$streak dias', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              Text('hoje: ${app.study.todayMinutes}/${app.study.goalMinutes} min',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: progress >= 1 ? AppColors.orange : AppColors.textDim)),
+            ]),
+          ]),
+        ),
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../core/phonemes.dart';
 import '../core/pronunciation.dart';
+import '../core/study_log.dart';
 import '../core/transcript.dart';
 import '../services/app_controller.dart';
 import '../services/paths.dart';
@@ -13,15 +14,17 @@ import '../services/recorder.dart';
 import 'common.dart';
 import 'theme.dart';
 
-Future<void> showPracticeDialog(BuildContext context, TranscriptLine line) => showDialog(
+/// [shadowing]: listen, repeat, score and go on to the next line, without pressing Record.
+Future<void> showPracticeDialog(BuildContext context, TranscriptLine line, {bool shadowing = false}) => showDialog(
   context: context,
-  builder: (_) => PracticeDialog(line: line),
+  builder: (_) => PracticeDialog(line: line, shadowing: shadowing),
 );
 
 /// Practice one subtitle line: listen, record, get a score.
 class PracticeDialog extends StatefulWidget {
-  const PracticeDialog({super.key, required this.line});
+  const PracticeDialog({super.key, required this.line, this.shadowing = false});
   final TranscriptLine line;
+  final bool shadowing;
 
   @override
   State<PracticeDialog> createState() => _PracticeDialogState();
@@ -30,6 +33,8 @@ class PracticeDialog extends StatefulWidget {
 enum _Phase { idle, recording, analyzing, result, failed }
 
 class _PracticeDialogState extends State<PracticeDialog> {
+  /// Changes in shadowing mode, when the user goes on to the next line.
+  late TranscriptLine _line = _line;
   final _recorder = VoiceRecorder();
   final _playback = Player();
   _Phase _phase = _Phase.idle;
@@ -37,7 +42,36 @@ class _PracticeDialogState extends State<PracticeDialog> {
   String? _error, _recording;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.shadowing) {
+      app.shadowing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startTurn());
+    }
+  }
+
+  /// Shadowing: play the line, then record right away.
+  void _startTurn() {
+    if (!mounted) return;
+    app.playSegment(_line, then: () {
+      if (mounted) _record();
+    });
+  }
+
+  void _goTo(TranscriptLine next) {
+    _playback.stop();
+    _deleteRecording();
+    setState(() {
+      _line = next;
+      _phase = _Phase.idle;
+      _result = null;
+    });
+    _startTurn();
+  }
+
+  @override
   void dispose() {
+    if (widget.shadowing) app.shadowing = false;
     _recorder.dispose();
     _playback.dispose();
     _deleteRecording();
@@ -65,7 +99,7 @@ class _PracticeDialogState extends State<PracticeDialog> {
     await _playback.stop();
     _deleteRecording();
     final path = p.join(AppPaths.practice.path, '${DateTime.now().millisecondsSinceEpoch}.wav');
-    final seconds = (widget.line.end - widget.line.start) * 2.5 + 3;
+    final seconds = (_line.end - _line.start) * 2.5 + 3;
     await _recorder.start(
       path,
       maxDuration: Duration(milliseconds: (seconds.clamp(8, 60) * 1000).round()),
@@ -80,8 +114,9 @@ class _PracticeDialogState extends State<PracticeDialog> {
   Future<void> _analyze(String path) async {
     setState(() => _phase = _Phase.analyzing);
     try {
-      final result = await app.assess(path, widget.line);
-      app.practice.add(result, widget.line, app.sourceName);
+      final result = await app.assess(path, _line);
+      app.practice.add(result, _line, app.sourceName);
+      app.study.add(StudyLog.secondsPerPractice);
       if (mounted) {
         setState(() {
           _result = result;
@@ -115,20 +150,21 @@ class _PracticeDialogState extends State<PracticeDialog> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SectionLabel('Treino de pronúncia'),
-                          SizedBox(height: 2),
-                          GradientText('Pratique a fala', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+                          SectionLabel(widget.shadowing ? 'Shadowing · ouça, repita, siga' : 'Treino de pronúncia'),
+                          const SizedBox(height: 2),
+                          GradientText(widget.shadowing ? 'Repita depois do personagem' : 'Pratique a fala',
+                              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
                         ],
                       ),
                     ),
                     if (!isCompact(context))
                       Flexible(
                         child: TagChip(
-                          '${app.sourceName ?? ''} · ${formatTime(widget.line.start)}',
+                          '${app.sourceName ?? ''} · ${formatTime(_line.start)}',
                           icon: Icons.movie_rounded,
                           color: AppColors.textDim,
                         ),
@@ -147,7 +183,7 @@ class _PracticeDialogState extends State<PracticeDialog> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.stroke),
                   ),
-                  child: SelectableText(widget.line.text, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+                  child: SelectableText(_line.text, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(height: 14),
                 _controls(),
@@ -157,9 +193,15 @@ class _PracticeDialogState extends State<PracticeDialog> {
                 if (!isMobile) const _SoundsSetupCard(),
                 _history(),
                 const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: GlassButton(label: 'Fechar', onPressed: () => Navigator.pop(context)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GlassButton(label: widget.shadowing ? 'Parar shadowing' : 'Fechar', onPressed: () => Navigator.pop(context)),
+                    if (widget.shadowing && _phase == _Phase.result && app.lineAfter(_line) != null) ...[
+                      const SizedBox(width: 10),
+                      PrimaryButton(label: 'Próxima fala', icon: Icons.skip_next_rounded, onPressed: () => _goTo(app.lineAfter(_line)!)),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -177,7 +219,7 @@ class _PracticeDialogState extends State<PracticeDialog> {
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          GlassButton(onPressed: recording ? null : () => app.playSegment(widget.line), icon: Icons.play_arrow_rounded, label: 'Ouvir o personagem'),
+          GlassButton(onPressed: recording ? null : () => app.playSegment(_line), icon: Icons.play_arrow_rounded, label: 'Ouvir o personagem'),
           if (recording) ...[
             PrimaryButton(
               gradient: const LinearGradient(colors: [AppColors.red, AppColors.pink]),
@@ -350,7 +392,7 @@ class _PracticeDialogState extends State<PracticeDialog> {
     return ListenableBuilder(
       listenable: app.practice,
       builder: (context, _) {
-        final record = app.practice.record(widget.line, app.sourceName);
+        final record = app.practice.record(_line, app.sourceName);
         if (record == null) return const SizedBox.shrink();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

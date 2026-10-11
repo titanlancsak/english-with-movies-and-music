@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import '../core/pronunciation.dart';
 import '../core/review.dart';
 import '../core/saved_words.dart';
+import '../core/study_log.dart';
 import '../core/transcript.dart';
 import 'media_tools.dart';
 import 'paths.dart';
@@ -37,9 +38,49 @@ class SavedWordsStore extends ChangeNotifier {
   void remove(String word) => _change(() => list.remove(word));
   void grade(String word, ReviewGrade grade) => _change(() => list.grade(word, grade));
 
+  /// Saves and redraws after a sync merged another device's words into [list].
+  void saveAfterSync() => _change(() {});
+
   void _change(VoidCallback change) {
     change();
     _writeJson(_file, list.toJson());
+    notifyListeners();
+  }
+}
+
+/// Study time for the daily goal and the streak (study.json).
+class StudyStore extends ChangeNotifier {
+  StudyStore() {
+    final json = _readJson(_file);
+    log = json == null ? StudyLog() : StudyLog.fromJson(json);
+    deviceId = (json?['deviceId'] as String?) ?? '${Platform.operatingSystem}-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+  }
+
+  late final StudyLog log;
+
+  /// Identifies this device in the sync file, so its time adds up with the other devices'.
+  late final String deviceId;
+  double _pending = 0;
+  File get _file => AppPaths.file(AppPaths.root, 'study.json');
+
+  int get goalMinutes => log.goalMinutes;
+  set goalMinutes(int value) {
+    log.goalMinutes = value;
+    save();
+  }
+
+  int get todayMinutes => log.secondsOn(DateTime.now()) ~/ 60;
+
+  /// Adds study time; published and saved every 15 seconds of study.
+  void add(double seconds) {
+    _pending += seconds;
+    if (_pending >= 15) save();
+  }
+
+  void save() {
+    if (_pending > 0) log.add(_pending, deviceId);
+    _pending = 0;
+    _writeJson(_file, {...log.toJson(), 'deviceId': deviceId});
     notifyListeners();
   }
 }
@@ -64,6 +105,11 @@ class PracticeStore extends ChangeNotifier {
 
   void remove(String id) {
     history.records.remove(id);
+    saveAfterSync();
+  }
+
+  /// Saves and redraws after a sync merged another device's attempts into [history].
+  void saveAfterSync() {
     _writeJson(_file, history.toJson());
     notifyListeners();
   }

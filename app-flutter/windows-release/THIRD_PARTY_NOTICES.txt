@@ -36,10 +36,20 @@ is included, larger models are downloaded by the app when chosen)
   License: MIT (OpenAI Whisper)
   Source:  https://huggingface.co/ggerganov/whisper.cpp
 
+Common English words (built into the app, data/common-words.txt in the source)
+  From wordfreq by Robyn Speer, data license CC BY-SA 4.0
+  Source:  https://github.com/rspeer/wordfreq
+
+Optional: whisper.cpp CUDA build for NVIDIA graphics cards (downloaded when the
+user turns it on in Ajustes; includes NVIDIA CUDA runtime libraries under the
+NVIDIA CUDA EULA)
+  Source:  https://github.com/ggml-org/whisper.cpp/releases
+
 Online services used by the app:
   Wiktionary (definitions and examples), CC BY-SA 4.0 — https://en.wiktionary.org
   Free Dictionary API — https://dictionaryapi.dev
   MyMemory translation API — https://mymemory.translated.net
+  GitHub API (checks for a new version) — https://github.com/titanlancsak/english-with-movies-and-music
 
 Flutter packages are listed in the source code (app-flutter/pubspec.yaml),
 each under its own open-source license.

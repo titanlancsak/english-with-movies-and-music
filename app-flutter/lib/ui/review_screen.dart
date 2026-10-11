@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../core/review.dart';
 import '../core/saved_words.dart';
+import '../core/study_log.dart';
 import '../core/word_normalizer.dart';
 import '../services/app_controller.dart';
 import 'common.dart';
@@ -64,6 +65,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   void _answer(ReviewGrade grade) {
     final key = _queue.first;
     app.savedWords.grade(key, grade);
+    app.study.add(StudyLog.secondsPerReview);
     setState(() {
       _reviewed++;
       if (grade != ReviewGrade.again) _remembered++;

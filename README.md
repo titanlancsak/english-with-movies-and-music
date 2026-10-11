@@ -49,6 +49,16 @@ Tudo é gratuito: o app e todas as ferramentas que ele usa são de código abert
 | 🎤 **Treino de pronúncia**: repita a fala do personagem e receba uma **nota de 0 a 100** | ✅ | ✅ | ✅ |
 | 📊 **Histórico de notas** por fala, com a evolução | ✅ | ✅ | ✅ |
 | 👄 **Análise som a som** (fonemas): mostra qual som saiu errado, como o "th" | ✅ (opcional) | ✅ (opcional) | — ² |
+| 🔁 **Repetir a fala** e **velocidade** 0,5× · 0,75× · 1× · 1,25× | ✅ | ✅ | ✅ |
+| 🗣️ **Shadowing**: ouve a fala, você repete, recebe a nota e segue para a próxima | ✅ | ✅ | ✅ |
+| 🙈 **Desafio de escuta**: a legenda fica escondida até você clicar | ✅ | ✅ | ✅ |
+| ✨ **Palavras difíceis** sublinhadas (fora das 5.000 mais comuns) | ✅ | ✅ | ✅ |
+| 🔥 **Meta diária e sequência de dias** | ✅ | ✅ | ✅ |
+| 📺 Usa a **legenda do YouTube** (ou um `.srt` ao lado do vídeo) em vez de transcrever | ✅ | ✅ | ✅ (`.srt`) |
+| 🔍 **Buscar na legenda** e pular para a cena | ✅ | ✅ | ✅ |
+| 🔄 **Sincronizar** palavras, histórico e meta entre aparelhos | ✅ (automático) | ✅ (automático) | ✅ (por arquivo) |
+| ⚡ Transcrição pela **placa de vídeo** | ✅ (Metal) | ✅ NVIDIA (opcional) | — |
+| 🆕 Aviso de **versão nova** | ✅ | ✅ | ✅ |
 
 ¹ As lojas de aplicativos não permitem apps que baixam vídeos do YouTube. No celular, use arquivos que já estão no aparelho.
 ² Ainda não disponível no celular.
@@ -62,6 +72,23 @@ Você ouve o personagem, grava a mesma frase e o app compara palavra por palavra
 - **Completude (15%)**: se você falou a frase inteira.
 
 Cada palavra aparece em verde (correta), amarelo (pouco clara), vermelho (errada) ou cinza (faltou), com dicas em português. A **análise som a som** opcional mostra também o fonema errado, por exemplo: *“think”: você disse /t/ no lugar de /θ/. Ponha a ponta da língua entre os dentes…*
+
+### Ferramentas de estudo (embaixo do vídeo)
+
+- **Repetir fala**: a fala atual toca de novo sem parar, até você desligar. Junto com a **velocidade** (0,5× a 1,25×, sem mudar o tom da voz), ajuda a entender falas rápidas.
+- **Shadowing**: o app toca uma fala, pausa, grava você repetindo, dá a nota e oferece a **próxima fala**. É o treino de pronúncia em sequência, sem precisar apertar nada.
+- **Desafio de escuta**: a legenda fica embaçada. Tente entender só ouvindo e clique na fala para conferir.
+- **Palavras difíceis**: as palavras fora das 5.000 mais comuns do inglês (lista do [wordfreq](https://github.com/rspeer/wordfreq), feita em parte com legendas de filmes) ganham um sublinhado pontilhado. Nomes próprios são ignorados.
+- **Buscar** (⌘F no Mac): acha uma palavra ou frase na legenda e pula para a cena.
+- **Meta diária**: assistir, revisar e praticar contam minutos. A biblioteca mostra 🔥 quantos dias seguidos você bateu a meta (5 a 60 minutos, você escolhe).
+
+### Legendas que já vêm com o vídeo
+
+Se o vídeo do YouTube tem legenda em inglês feita por pessoas, o app baixa junto e usa ela: fica pronta na hora e mais certa que a transcrição. O mesmo vale para qualquer filme com um arquivo `.srt` na mesma pasta (`Filme.srt` ou `Filme.en.srt`). Para usar a transcrição automática mesmo assim, clique em **Transcrever de novo**.
+
+### Sincronizar entre computador e celular
+
+Em **Ajustes › Sincronizar**, escolha uma pasta que já sincroniza sozinha (Google Drive, Dropbox, OneDrive ou iCloud Drive). O app guarda nela o arquivo `english-with-movies-sync.json` com as palavras salvas, o histórico de pronúncia e o tempo de estudo, e junta com os dados dos outros aparelhos (Mac e Windows usam o mesmo formato). No Android, toque em **Abrir arquivo** para juntar o arquivo da pasta com os dados do celular e em **Salvar arquivo** para devolvê-lo.
 
 ### Como funciona a revisão
 
@@ -136,6 +163,8 @@ Como vai funcionar: Android 7 ou mais novo, celular de 64 bits, app de uns 20 MB
 | Microfone | AVAudioRecorder | [record](https://pub.dev/packages/record) |
 | Análise som a som | [wav2vec2 de fonemas da Meta](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) em ONNX (Python) + [espeak-ng](https://github.com/espeak-ng/espeak-ng) | Windows: o mesmo modelo e o mesmo analisador, empacotado com PyInstaller; espeak-ng incluído no app |
 | Repetição espaçada | SM-2 (implementação própria) | SM-2 (implementação própria) |
+| Palavras comuns | [wordfreq](https://github.com/rspeer/wordfreq) (5.000 palavras, CC BY-SA 4.0) | o mesmo |
+| Sincronização | arquivo JSON numa pasta sincronizada (formato em [`data/sync-example.json`](data/sync-example.json)) | o mesmo formato |
 | Builds | — | GitHub Actions: Windows (compila, empacota e testa num Windows real) e Android (compila o whisper.cpp e o FFmpeg para ARM e gera o APK assinado) |
 
 ### Como funciona por dentro
@@ -157,7 +186,7 @@ interface: player em cima, legenda interativa embaixo
 
 ### Privacidade
 
-O áudio dos seus filmes e a sua voz **nunca saem do seu computador ou celular**: a transcrição e a avaliação de pronúncia rodam localmente. A internet é usada só para baixar os modelos na primeira vez, para baixar vídeos que você pedir, para o dicionário e (no Windows e no Android) para a tradução.
+O áudio dos seus filmes e a sua voz **nunca saem do seu computador ou celular**: a transcrição e a avaliação de pronúncia rodam localmente. A internet é usada só para baixar os modelos na primeira vez, para baixar vídeos que você pedir, para o dicionário, (no Windows e no Android) para a tradução e para ver se há versão nova. A sincronização usa uma pasta sua (Google Drive, Dropbox…); o app não tem servidor.
 
 ---
 
@@ -223,4 +252,4 @@ Baixe e use apenas conteúdo que você tem direito de assistir. Muitos vídeos d
 
 [MIT](LICENSE) © 2026 Santos Lucas.
 
-As ferramentas usadas pelo app têm as suas próprias licenças: FFmpeg (GPL no Windows, LGPL no Android), whisper.cpp (MIT), yt-dlp (Unlicense), espeak-ng (GPL-3.0), modelo wav2vec2 de fonemas (Apache 2.0), modelos Whisper (MIT). Veja [`THIRD_PARTY_NOTICES.txt`](app-flutter/windows-release/THIRD_PARTY_NOTICES.txt).
+As ferramentas usadas pelo app têm as suas próprias licenças: FFmpeg (GPL no Windows, LGPL no Android), whisper.cpp (MIT), yt-dlp (Unlicense), espeak-ng (GPL-3.0), modelo wav2vec2 de fonemas (Apache 2.0), modelos Whisper (MIT), lista de palavras do wordfreq (CC BY-SA 4.0). Veja [`THIRD_PARTY_NOTICES.txt`](app-flutter/windows-release/THIRD_PARTY_NOTICES.txt).

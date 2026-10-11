@@ -21,6 +21,11 @@ PRIMEIRO USO
 - Análise som a som da pronúncia: na tela de prática, clique em
   "Ativar análise por som". O app baixa o modelo de sons (320 MB, uma vez só).
 - Os vídeos baixados do YouTube ficam em Vídeos\English with Movies.
+- Embaixo do vídeo: repetir a fala, velocidade, shadowing, desafio de escuta,
+  palavras difíceis e busca na legenda.
+- Ajustes (canto de baixo, à esquerda): meta diária, sincronização com o
+  celular e o Mac por uma pasta do Google Drive/Dropbox/OneDrive e, se o
+  computador tiver placa de vídeo NVIDIA, transcrição muito mais rápida.
 
 A pasta "tools" contém programas gratuitos que o app usa (ffmpeg, whisper.cpp,
 yt-dlp, espeak-ng e o analisador de sons). Não apague essa pasta.

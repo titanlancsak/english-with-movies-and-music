@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
+import '../core/app_version.dart';
 import '../core/parsers.dart';
 import '../core/transcript.dart';
 import 'log.dart';
@@ -82,10 +83,20 @@ class MediaTools {
       _run('ffmpeg', ['-nostdin', '-y', '-loglevel', 'error', '-i', media, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wav]);
 
   /// One video frame as JPEG, for library covers.
-  Future<void> extractFrame(String media, double seconds, String output) => _run('ffmpeg', [
-        '-nostdin', '-y', '-loglevel', 'error', '-ss', seconds.toStringAsFixed(1), '-i', media,
-        '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', output,
-      ]);
+  /// Without the black bars of films in cinema format (found with cropdetect on a few frames).
+  Future<void> extractFrame(String media, double seconds, String output) async {
+    final start = seconds.toStringAsFixed(1);
+    final detection = StringBuffer();
+    try {
+      await _run('ffmpeg', ['-nostdin', '-hide_banner', '-ss', start, '-i', media, '-frames:v', '8', '-vf', 'cropdetect=24:2:0', '-f', 'null', '-'],
+          onLine: detection.writeln);
+    } catch (_) {}
+    final crop = cropFromFfmpegOutput(detection.toString());
+    await _run('ffmpeg', [
+      '-nostdin', '-y', '-loglevel', 'error', '-ss', start, '-i', media,
+      '-frames:v', '1', '-vf', '${crop == null ? '' : '$crop,'}scale=640:-2', '-q:v', '4', output,
+    ]);
+  }
 
   /// Duration in seconds, or null.
   Future<double?> duration(String media) async {
@@ -99,14 +110,15 @@ class MediaTools {
   }
 
   /// Runs Whisper on a WAV file and returns the parsed transcript.
-  Future<Transcript> transcribe(String wav, String model, {void Function(double)? progress}) async {
+  /// [executable]: another whisper-cli, e.g. the graphics card build (see gpu.dart).
+  Future<Transcript> transcribe(String wav, String model, {void Function(double)? progress, String? executable}) async {
     final base = p.withoutExtension(wav);
     // Phones: only the big cores help (usually 4 of 8).
     final threads = Platform.isAndroid ? Platform.numberOfProcessors.clamp(2, 4) : (Platform.numberOfProcessors - 2).clamp(2, 16);
     await _run('whisper-cli', [
       '-m', model, '-f', wav, '-l', 'en', '-t', '$threads', '-ojf', '-of', base, '-pp',
       '--suppress-nst', // no "[Music]" or "(applause)" tokens
-    ], onLine: (line) {
+    ], executable: executable, onLine: (line) {
       // "whisper_print_progress_callback: progress =  42%"
       final match = RegExp(r'progress =\s*(\d+)%').firstMatch(line);
       if (match != null) progress?.call(int.parse(match.group(1)!) / 100);
@@ -126,6 +138,8 @@ class MediaTools {
         '--no-playlist', '--newline', '--progress',
         '-S', 'res:1080,vcodec:h264,acodec:aac', // plays everywhere, up to 1080p
         '--merge-output-format', 'mp4',
+        // Subtitles written by people (not the automatic ones), in English: used instead of transcribing.
+        '--write-subs', '--sub-langs', 'en.*,en', '--convert-subs', 'srt',
         if (locate('ffmpeg') != null) ...['--ffmpeg-location', locate('ffmpeg')!],
         '-o', p.join(folder, '%(title).120B [%(id)s].%(ext)s'),
         '--print', 'after_move:FILE:%(filepath)s',
@@ -153,8 +167,8 @@ class MediaTools {
     }
   }
 
-  Future<void> _run(String tool, List<String> arguments, {void Function(String line)? onLine}) async {
-    final executable = locate(tool);
+  Future<void> _run(String tool, List<String> arguments, {void Function(String line)? onLine, String? executable}) async {
+    executable ??= locate(tool);
     if (executable == null) {
       throw ToolException('Não encontrei o programa "$tool". Baixe o app novamente pela página de Releases.');
     }
@@ -275,6 +289,25 @@ class TranscriptCache {
       final transcript = _file(key(media, model.fileName));
       if (transcript.existsSync()) transcript.deleteSync();
     }
+    final subtitles = siblingSubtitles(media);
+    if (subtitles != null) File(subtitles).deleteSync();
     file.deleteSync();
   }
+}
+
+/// English subtitles next to the video: "Film.srt", "Film.en.srt", "Film.en-US.srt"…
+/// (yt-dlp saves YouTube's subtitles this way; many film downloads come with one too).
+String? siblingSubtitles(String media) {
+  final folder = Directory(p.dirname(media));
+  final base = p.basenameWithoutExtension(media);
+  if (!folder.existsSync()) return null;
+  final candidates = folder.listSync().whereType<File>().map((f) => f.path).where((path) {
+    if (p.extension(path).toLowerCase() != '.srt') return false;
+    final name = p.basenameWithoutExtension(path);
+    if (name == base) return true;
+    return name.startsWith('$base.') && name.substring(base.length + 1).toLowerCase().startsWith('en');
+  }).toList()
+    // Prefer plain English ("en") over regional variants.
+    ..sort((a, b) => a.length.compareTo(b.length));
+  return candidates.firstOrNull;
 }

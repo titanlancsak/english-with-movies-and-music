@@ -29,6 +29,12 @@ class SavedWord {
   final DateTime dateAdded;
   ReviewState? review;
 
+  /// When the word last changed (saved or reviewed); the newest copy wins when syncing.
+  DateTime get changed {
+    final reviewed = review?.lastReviewed;
+    return reviewed != null && reviewed.isAfter(dateAdded) ? reviewed : dateAdded;
+  }
+
   /// File name without extension or a trailing video id such as " [R6MlUcmOul8]".
   String? get sourceName => sourcePath == null ? null : cleanMediaTitle(sourcePath!);
 
@@ -70,9 +76,14 @@ String cleanMediaTitle(String path) {
 
 /// The saved words, newest first.
 class WordList {
-  WordList([List<SavedWord>? words]) : words = words ?? [];
+  WordList([List<SavedWord>? words, Map<String, DateTime>? deleted])
+      : words = words ?? [],
+        deleted = deleted ?? {};
 
   final List<SavedWord> words;
+
+  /// Removed words and when, so a sync does not bring them back from another device.
+  final Map<String, DateTime> deleted;
 
   bool contains(String word) {
     final key = lookupKey(word);
@@ -84,13 +95,15 @@ class WordList {
     if (word.key.isEmpty) return;
     final existing = words.where((w) => w.key == word.key).firstOrNull;
     if (word.review == null && existing != null) word.review = existing.review;
-    remove(word.key);
+    words.removeWhere((w) => w.key == word.key);
+    deleted.remove(word.key);
     words.insert(0, word);
   }
 
-  void remove(String word) {
+  void remove(String word, [DateTime? at]) {
     final key = lookupKey(word);
     words.removeWhere((w) => w.key == key);
+    deleted[key] = at ?? DateTime.now();
   }
 
   List<SavedWord> filtered(String query) {
@@ -135,10 +148,18 @@ class WordList {
     }
   }
 
-  Map<String, dynamic> toJson() => {'words': words.map((w) => w.toJson()).toList()};
+  Map<String, dynamic> toJson() => {
+        'words': words.map((w) => w.toJson()).toList(),
+        'deleted': deleted.map((key, date) => MapEntry(key, date.toUtc().toIso8601String())),
+      };
 
-  factory WordList.fromJson(Map<String, dynamic> json) =>
-      WordList((json['words'] as List? ?? []).map((w) => SavedWord.fromJson(w as Map<String, dynamic>)).toList());
+  factory WordList.fromJson(Map<String, dynamic> json) => WordList(
+        (json['words'] as List? ?? []).map((w) => SavedWord.fromJson(w as Map<String, dynamic>)).toList(),
+        {
+          for (final e in (json['deleted'] as Map? ?? {}).entries)
+            if (DateTime.tryParse(e.value as String) != null) e.key as String: DateTime.parse(e.value as String),
+        },
+      );
 }
 
 String csvField(String value) {

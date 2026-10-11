@@ -73,6 +73,13 @@ class Transcript {
 
   final List<TranscriptLine> lines;
 
+  /// Lines whose text contains the query (ignoring case and accents), in order.
+  List<int> lineIndicesMatching(String query) {
+    final q = foldAccents(query.trim().toLowerCase());
+    if (q.isEmpty) return [];
+    return [for (var i = 0; i < lines.length; i++) if (foldAccents(lines[i].text.toLowerCase()).contains(q)) i];
+  }
+
   /// Index of the line being spoken at [time] (binary search). Between two lines the
   /// previous one stays active for up to 2 seconds after it ends.
   int? lineIndexAt(double time) {
@@ -135,3 +142,9 @@ List<TranscriptLine> buildLines(List<TimedWord> words, {Set<int> segmentBreaks =
   flush();
   return lines;
 }
+
+const _accents = {'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+  'ó': 'o', 'ò': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ç': 'c', 'ñ': 'n'};
+
+/// "café" -> "cafe", for searches that ignore accents.
+String foldAccents(String text) => text.split('').map((c) => _accents[c] ?? c).join();

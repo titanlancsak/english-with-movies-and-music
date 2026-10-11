@@ -13,6 +13,7 @@ import '../core/phonemes.dart';
 import '../core/pronunciation.dart';
 import '../core/saved_words.dart';
 import '../core/transcript.dart';
+import 'gpu.dart';
 import 'language.dart';
 import 'log.dart';
 import 'media_tools.dart';
@@ -20,6 +21,8 @@ import 'paths.dart';
 import 'phonemes.dart';
 import 'sound_setup.dart';
 import 'stores.dart';
+import 'sync_service.dart';
+import 'updates.dart';
 
 /// The single app state, created in main().
 late final AppController app;
@@ -34,6 +37,12 @@ class AppController extends ChangeNotifier {
     final settings = _settings;
     model = WhisperModel.values.firstWhere((m) => m.name == settings['model'], orElse: () => WhisperModel.base);
     showTranslation = settings['showTranslation'] as bool? ?? false;
+    speed = (settings['speed'] as num?)?.toDouble() ?? 1;
+    highlightUncommon = settings['highlightUncommon'] as bool? ?? true;
+    unawaited(updates.check());
+    // Creating the sync service starts it (when a folder is set); the shell shows its state.
+    sync.addListener(notifyListeners);
+    updates.addListener(notifyListeners);
     player.stream.position.listen(_onPosition);
     // A film takes a while to transcribe on a phone; the screen stays on meanwhile.
     if (Platform.isAndroid) {
@@ -55,6 +64,10 @@ class AppController extends ChangeNotifier {
   final dictionary = DictionaryService();
   final translator = Translator();
   final speaker = Speaker();
+  final study = StudyStore();
+  late final sync = SyncService(savedWords, practice, study);
+  final updates = UpdateChecker();
+  final gpu = GpuWhisper();
   final soundSetup = SoundSetup();
 
   final player = Player();
@@ -80,9 +93,36 @@ class AppController extends ChangeNotifier {
   late WhisperModel model;
   late bool showTranslation;
 
+  // MARK: Study tools
+
+  /// Playback speed (0.5 to 1.25), kept between films.
+  late double speed;
+
+  /// Plays the current line again and again.
+  bool loopLine = false;
+  int? _loopIndex;
+
+  /// Listening challenge: the subtitles stay hidden until a line is tapped.
+  bool hideSubtitles = false;
+  final revealedLines = <int>{};
+
+  /// Underlines words outside the 5,000 most common ones.
+  late bool highlightUncommon;
+
+  /// Shadowing: listen to a line, repeat it, get the score, go to the next one.
+  bool shadowing = false;
+
+  bool showSearch = false;
+  String searchQuery = '';
+  int searchIndex = 0;
+
+  /// Where the subtitles came from when they were not transcribed, e.g. "Legenda do YouTube".
+  String? subtitleSource;
+
   MediaTools? _tools;
   double? _lastTime;
   double? _segmentEnd;
+  VoidCallback? _segmentDone;
   DateTime _lastPositionSave = DateTime(0);
 
   bool get isAudio => mediaPath != null && LibraryStore.audioExtensions.contains(p.extension(mediaPath!).replaceFirst('.', '').toLowerCase());
@@ -100,7 +140,80 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  void _saveSettings() => _settingsFile.writeAsStringSync(jsonEncode({'model': model.name, 'showTranslation': showTranslation}));
+  void _saveSettings() => _settingsFile.writeAsStringSync(jsonEncode(
+      {'model': model.name, 'showTranslation': showTranslation, 'speed': speed, 'highlightUncommon': highlightUncommon}));
+
+  void setSpeed(double value) {
+    speed = value;
+    player.setRate(value);
+    _saveSettings();
+    notifyListeners();
+  }
+
+  void setLoopLine(bool value) {
+    loopLine = value;
+    _loopIndex = value ? activeLine.value : null;
+    notifyListeners();
+  }
+
+  void setHideSubtitles(bool value) {
+    hideSubtitles = value;
+    revealedLines.clear();
+    notifyListeners();
+  }
+
+  void reveal(int line) {
+    revealedLines.add(line);
+    notifyListeners();
+  }
+
+  void setHighlightUncommon(bool value) {
+    highlightUncommon = value;
+    _saveSettings();
+    notifyListeners();
+  }
+
+  // MARK: - Search
+
+  List<int> get searchMatches => transcript?.lineIndicesMatching(searchQuery) ?? [];
+
+  int? get currentSearchLine {
+    final matches = searchMatches;
+    return matches.isEmpty ? null : matches[searchIndex.clamp(0, matches.length - 1)];
+  }
+
+  void setShowSearch(bool value) {
+    showSearch = value;
+    if (!value) searchQuery = '';
+    notifyListeners();
+  }
+
+  void setSearchQuery(String value) {
+    searchQuery = value;
+    searchIndex = 0;
+    notifyListeners();
+  }
+
+  /// Goes to the next (1) or previous (-1) line containing the search text.
+  void showSearchResult(int step) {
+    final matches = searchMatches;
+    final t = transcript;
+    if (matches.isEmpty || t == null) return;
+    searchIndex = ((searchIndex + step) % matches.length + matches.length) % matches.length;
+    seek(t.lines[matches[searchIndex]].start);
+    notifyListeners();
+  }
+
+  // MARK: - Shadowing
+
+  /// The line to practice: the one being spoken, or the first.
+  TranscriptLine? get currentLine {
+    final t = transcript;
+    if (t == null || t.lines.isEmpty) return null;
+    return t.lines[activeLine.value ?? 0];
+  }
+
+  TranscriptLine? lineAfter(TranscriptLine line) => transcript?.lines.where((l) => l.start > line.start + 0.01).firstOrNull;
 
   /// Leaving the player pauses it; the film stays open under "Assistindo".
   void showSection(AppSection value) {
@@ -137,6 +250,10 @@ class AppController extends ChangeNotifier {
     cancel();
     mediaPath = path;
     transcript = null;
+    subtitleSource = null;
+    revealedLines.clear();
+    loopLine = false;
+    searchQuery = '';
     activeLine.value = null;
     activeWord.value = null;
     _lastTime = null;
@@ -149,6 +266,7 @@ class AppController extends ChangeNotifier {
     unawaited(_transcribe(path, skipCache: false));
     try {
       await player.open(Media(path), play: false);
+      await player.setRate(speed);
       if (at != null && at > 0) {
         await player.stream.duration.firstWhere((d) => d > Duration.zero).timeout(const Duration(seconds: 10), onTimeout: () => Duration.zero);
         await player.seek(Duration(milliseconds: (at * 1000).round()));
@@ -175,7 +293,12 @@ class AppController extends ChangeNotifier {
   void importSubtitles(String path) {
     final contents = File(path).readAsStringSync(encoding: const Utf8Codec(allowMalformed: true));
     transcript = parseSrt(contents);
-    if (mediaPath != null) TranscriptCache.save(transcript!, TranscriptCache.key(mediaPath!, model.fileName));
+    if (mediaPath != null) {
+      final key = TranscriptCache.key(mediaPath!, model.fileName);
+      TranscriptCache.save(transcript!, key);
+      subtitleSource = 'Legenda importada (.srt)';
+      AppPaths.file(AppPaths.transcripts, '$key.source').writeAsStringSync(subtitleSource!);
+    }
     status = mediaPath == null ? Status.idle : Status.ready;
     notifyListeners();
   }
@@ -217,14 +340,34 @@ class AppController extends ChangeNotifier {
       _report(error);
       return;
     }
+    final sourceMarker = AppPaths.file(AppPaths.transcripts, '$key.source');
     final cached = skipCache ? null : TranscriptCache.load(key);
     if (cached != null) {
       log('Transcrição em cache: ${cached.lines.length} falas');
       transcript = cached;
+      subtitleSource = sourceMarker.existsSync() ? sourceMarker.readAsStringSync() : null;
       status = Status.ready;
       notifyListeners();
       return;
     }
+    // Subtitles that came with the video (YouTube, or a .srt next to the film) are ready at once
+    // and usually more accurate than a transcription. "Transcrever de novo" uses Whisper instead.
+    final srt = skipCache ? null : siblingSubtitles(path);
+    if (srt != null) {
+      final parsed = parseSrt(File(srt).readAsStringSync(encoding: const Utf8Codec(allowMalformed: true)));
+      if (parsed.lines.isNotEmpty) {
+        log('Legenda ao lado do vídeo: ${parsed.lines.length} falas');
+        TranscriptCache.save(parsed, key);
+        transcript = parsed;
+        subtitleSource = p.isWithin(AppPaths.downloads.path, path) && !Platform.isAndroid ? 'Legenda do YouTube' : 'Legenda do arquivo .srt';
+        sourceMarker.writeAsStringSync(subtitleSource!);
+        status = Status.ready;
+        library.refresh();
+        notifyListeners();
+        return;
+      }
+    }
+    if (sourceMarker.existsSync()) sourceMarker.deleteSync();
     final tools = _tools = MediaTools();
     final wav = AppPaths.file(AppPaths.work, '$key.wav').path;
     try {
@@ -235,9 +378,26 @@ class AppController extends ChangeNotifier {
       }
       _setWorking('Extraindo o áudio…', null);
       await tools.extractAudio(path, wav);
-      _setWorking('Transcrevendo as falas…', 0);
-      log('Transcrevendo com ${model.fileName}');
-      final result = await tools.transcribe(wav, model.file.path, progress: _setProgress);
+      Transcript? result;
+      // A Windows computer with an NVIDIA card can transcribe on it (see gpu.dart); if that fails,
+      // the processor takes over.
+      final gpuExecutable = gpu.usable ? gpu.executable : null;
+      if (gpuExecutable != null) {
+        _setWorking('Transcrevendo as falas com a placa de vídeo…', 0);
+        log('Transcrevendo com ${model.fileName} na placa de vídeo');
+        try {
+          result = await tools.transcribe(wav, model.file.path, progress: _setProgress, executable: gpuExecutable);
+        } on CancelledException {
+          rethrow;
+        } catch (error) {
+          gpu.markFailed(error);
+        }
+      }
+      if (result == null) {
+        _setWorking('Transcrevendo as falas…', 0);
+        log('Transcrevendo com ${model.fileName}');
+        result = await tools.transcribe(wav, model.file.path, progress: _setProgress);
+      }
       log('Transcrição pronta: ${result.lines.length} falas');
       if (path != mediaPath) return;
       TranscriptCache.save(result, key);
@@ -325,21 +485,40 @@ class AppController extends ChangeNotifier {
   }
 
   /// Plays only this line, then pauses.
-  void playSegment(TranscriptLine line) {
+  /// Plays only this line, then pauses; [then] runs when it finished playing.
+  void playSegment(TranscriptLine line, {VoidCallback? then}) {
     seek(line.start);
     _segmentEnd = line.end + 0.2;
+    _segmentDone = then;
     player.play();
   }
 
   void _onPosition(Duration position) {
     final time = position.inMilliseconds / 1000;
     // A jump: the slider, the skip buttons, a click on a line… not normal playback.
-    if (_lastTime != null && (time - _lastTime!).abs() > 1) _jumpSubtitles(time);
+    final last = _lastTime;
+    // Study time for the daily goal: real seconds of playback.
+    if (last != null && player.state.playing && time > last && time - last < 1) study.add((time - last) / speed);
+    final jumped = last != null && (time - last).abs() > 1;
+    if (jumped) _jumpSubtitles(time);
     _lastTime = time;
 
     if (_segmentEnd != null && time >= _segmentEnd!) {
       _segmentEnd = null;
       player.pause();
+      final done = _segmentDone;
+      _segmentDone = null;
+      done?.call();
+    }
+    // Repeat the line: back to its start once it ends.
+    final lines = transcript?.lines;
+    if (loopLine && _segmentEnd == null && lines != null && lines.isNotEmpty) {
+      if (jumped || _loopIndex == null) _loopIndex = transcript!.lineIndexAt(time) ?? _loopIndex;
+      final index = _loopIndex;
+      if (index != null && time > lines[index].end + 0.3) {
+        seek(lines[index].start);
+        return;
+      }
     }
     if (mediaPath != null && DateTime.now().difference(_lastPositionSave).inSeconds >= 5) {
       _lastPositionSave = DateTime.now();

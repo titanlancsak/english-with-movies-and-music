@@ -13,6 +13,7 @@ import 'player_screen.dart';
 import 'practice_history_screen.dart';
 import 'review_screen.dart';
 import 'saved_words_screen.dart';
+import 'settings_dialog.dart';
 import 'theme.dart';
 
 /// The app shell: a sidebar on a computer, a bottom bar on a phone, and the current screen.
@@ -135,7 +136,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _banner() => _missingTools.isEmpty
+  Widget _banner() => Column(children: [_updateBanner(), _toolsBanner()]);
+
+  /// "Nova versão disponível" when GitHub has a newer release.
+  Widget _updateBanner() {
+    if (app.updates.available == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: GlassCard(
+        radius: 14,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(children: [
+          const Icon(Icons.auto_awesome_rounded, color: AppColors.violet),
+          const SizedBox(width: 10),
+          Expanded(child: Text('Nova versão ${app.updates.availableVersion} disponível', style: const TextStyle(fontWeight: FontWeight.w700))),
+          GlassButton(label: 'Depois', onPressed: app.updates.dismiss),
+          const SizedBox(width: 8),
+          PrimaryButton(label: 'Baixar', icon: Icons.download_rounded, onPressed: app.updates.download),
+        ]),
+      ),
+    );
+  }
+
+  Widget _toolsBanner() => _missingTools.isEmpty
       ? const SizedBox.shrink()
       : Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -183,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (app.section == AppSection.library) {
       return [
-        if (compact) GlassIconButton(icon: Icons.tune, tooltip: 'Qualidade da transcrição', onPressed: () => chooseModel(context)),
+        if (compact) GlassIconButton(icon: Icons.settings_rounded, tooltip: 'Ajustes', onPressed: () => showSettings(context)),
         if (!isMobile) GlassButton(label: 'YouTube', icon: Icons.link, onPressed: () => showLinkDialog(context)),
         compact
             ? GlassIconButton(icon: Icons.add, tooltip: 'Abrir arquivo', onPressed: openMediaFile)
@@ -210,9 +233,10 @@ class _TopBar extends StatelessWidget {
     final compact = isCompact(context);
     final title = switch (app.section) {
       AppSection.player => app.sourceName ?? 'Assistindo',
-      AppSection.savedWords => 'Palavras salvas',
-      AppSection.review => 'Revisão',
-      AppSection.practice => 'Pronúncia',
+      // These screens show a big title of their own; a phone does not repeat it above.
+      AppSection.savedWords => compact ? '' : 'Palavras salvas',
+      AppSection.review => compact ? '' : 'Revisão',
+      AppSection.practice => compact ? '' : 'Pronúncia',
       AppSection.library => compact ? 'English with Movies' : 'Biblioteca',
     };
     return Padding(
@@ -318,30 +342,23 @@ class _Sidebar extends StatelessWidget {
                     _SidebarItem(section: AppSection.practice, icon: Icons.graphic_eq_rounded, title: 'Pronúncia', badge: average),
                     const Spacer(),
                     const SizedBox(height: 12),
-                    GlassCard(
-                      radius: 12,
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SectionLabel('Transcrição'),
-                          const SizedBox(height: 6),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () => chooseModel(context),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(app.model.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                                  ),
-                                  const Icon(Icons.unfold_more, size: 16, color: AppColors.textDim),
-                                ],
-                              ),
-                            ),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => showSettings(context),
+                      child: GlassCard(
+                        radius: 12,
+                        padding: const EdgeInsets.all(12),
+                        child: Row(children: [
+                          const Icon(Icons.settings_rounded, size: 18, color: AppColors.textDim),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Text('Ajustes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                              Text(app.sync.folder == null ? app.model.title : 'Sincronização ligada',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.textDim)),
+                            ]),
                           ),
-                        ],
+                        ]),
                       ),
                     ),
                   ],

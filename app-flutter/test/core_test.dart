@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:english_with_movies/core/app_version.dart';
+import 'package:english_with_movies/core/common_words.dart';
 import 'package:english_with_movies/core/dictionary.dart';
 import 'package:english_with_movies/core/parsers.dart';
 import 'package:english_with_movies/core/phonemes.dart';
@@ -7,6 +10,8 @@ import 'package:english_with_movies/core/pronunciation.dart';
 import 'package:english_with_movies/core/review.dart';
 import 'package:english_with_movies/core/saved_words.dart';
 import 'package:english_with_movies/core/sound_annotations.dart';
+import 'package:english_with_movies/core/study_log.dart';
+import 'package:english_with_movies/core/sync.dart';
 import 'package:english_with_movies/core/transcript.dart';
 import 'package:english_with_movies/core/word_normalizer.dart';
 import 'package:test/test.dart';
@@ -233,6 +238,75 @@ void main() {
       final withSounds = scorePronunciation(line, words('We need to leave the harbor before sunset.'), sounds: think);
       expect(withSounds.score, lessThan(perfect.score));
       expect(withSounds.sounds, isNotNull);
+    });
+  });
+
+  group('study tools', () {
+    test('uncommon words', () {
+      expect(isUncommonWord('the') || isUncommonWord('running') || isUncommonWord("didn't"), isFalse);
+      expect(isUncommonWord('harbor') || isUncommonWord('sunset'), isTrue);
+      expect(isUncommonWord('Juan'), isFalse);
+      expect(isUncommonWord('Serendipity', atSentenceStart: true), isTrue);
+      expect(isUncommonWord('ok') || isUncommonWord('1984'), isFalse);
+    });
+
+    test('daily goal and streak', () {
+      final now = DateTime.now();
+      DateTime daysAgo(int n) => DateTime(now.year, now.month, now.day - n, 12);
+      final study = StudyLog()
+        ..add(700, 'pc', daysAgo(1))
+        ..add(650, 'pc', daysAgo(2))
+        ..add(100, 'pc', daysAgo(3));
+      expect(study.streak(now), 2);
+      study
+        ..add(300, 'pc', now)
+        ..add(300, 'phone', now);
+      expect(study.streak(now), 3);
+      expect(study.todayProgress(now), 1);
+      study.merge(StudyLog()..add(900, 'phone', now));
+      expect(study.secondsOn(now), 1200);
+    });
+
+    test('versions, search and covers', () {
+      expect(isNewerVersion('v1.10.0', '1.9.2'), isTrue);
+      expect(isNewerVersion('1.2.0', '1.2.0') || isNewerVersion('sound-model', '1.0'), isFalse);
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      expect(RegExp(r'^version: (\S+)\+', multiLine: true).firstMatch(pubspec)!.group(1), appVersion, reason: 'app_version.dart must match pubspec.yaml');
+      final transcript = Transcript([TranscriptLine(0, 0, 1, words('Café time')), TranscriptLine(1, 2, 3, words('No coffee'))]);
+      expect(transcript.lineIndicesMatching('cafe'), [0]);
+      expect(transcript.lineIndicesMatching('  '), isEmpty);
+      expect(cropFromFfmpegOutput('x crop=1920:1072:0:4 y\n[x] crop=1920:800:0:140', width: 1920, height: 1080), 'crop=1920:800:0:140');
+      expect(cropFromFfmpegOutput('crop=1920:1080:0:0', width: 1920, height: 1080), isNull);
+      expect(cropFromFfmpegOutput('crop=640:96:600:400'), isNull);
+    });
+
+    test('sync with other devices (same file as the Mac)', () {
+      final remote = SyncDocument.fromJson(jsonDecode(File('../data/sync-example.json').readAsStringSync()) as Map<String, dynamic>);
+      expect(remote.words.length, 2);
+      expect(remote.words.first.review?.interval, 3);
+      expect(remote.deletedWords.containsKey('storm'), isTrue);
+
+      final words = WordList()
+        ..add(SavedWord(word: 'storm', dateAdded: DateTime.fromMillisecondsSinceEpoch(1791000000 * 1000)))
+        ..add(SavedWord(word: 'harbor', translation: 'porto (antigo)', dateAdded: DateTime.fromMillisecondsSinceEpoch(1700000000 * 1000)))
+        ..add(SavedWord(word: 'sunset'));
+      final practice = PracticeHistory();
+      final study = StudyLog(goalMinutes: 15);
+      SyncDocument.merge(remote, words: words, practice: practice, study: study);
+      expect(words.words.map((w) => w.key).toSet(), {'harbor', 'journey', 'sunset'});
+      expect(words.words.firstWhere((w) => w.key == 'harbor').translation, 'porto');
+      expect(practice.attemptCount, 1);
+      expect(study.goalMinutes, 15);
+      SyncDocument.merge(remote, words: words, practice: practice, study: study);
+      expect(practice.attemptCount, 1, reason: 'merging twice does not duplicate');
+
+      final roundTrip = SyncDocument.fromJson(jsonDecode(jsonEncode(SyncDocument.of(words, practice, study).toJson())) as Map<String, dynamic>);
+      expect(roundTrip.words.length, 3);
+      expect(roundTrip.practice.first.attempts.length, 1);
+
+      final elsewhere = WordList(List.of(words.words), Map.of(words.deleted))..remove('sunset');
+      SyncDocument.merge(SyncDocument.of(elsewhere, practice, study), words: words, practice: practice, study: study);
+      expect(words.contains('sunset'), isFalse);
     });
   });
 }
