@@ -14,6 +14,8 @@ enum AppFolders {
     static let work = folder("work")
     /// Temporary microphone recordings, deleted when the practice sheet closes.
     static let practice = folder("practice")
+    /// Library covers.
+    static let thumbnails = folder("thumbnails")
 
     /// Videos downloaded from links, kept where the user can find them.
     static let downloads: URL = {
@@ -30,41 +32,32 @@ enum AppFolders {
     }
 }
 
-/// Videos the app downloaded from links. They are deleted when the app quits.
-enum DownloadedFiles {
-    private static let key = "downloadedFiles"
-
-    static var paths: [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
-
-    static func add(_ url: URL) {
-        UserDefaults.standard.set(paths + [url.path], forKey: key)
+/// Deleting media together with everything the app derived from it.
+enum MediaFiles {
+    /// Deletes the file, its converted copy and its transcripts.
+    static func delete(_ url: URL) {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        // Keys depend on the file's size and date, so compute them before deleting it.
+        let converted = AppFolders.work.appendingPathComponent(TranscriptCache.key(for: url, model: "convert") + ".mp4")
+        let transcripts = WhisperModel.allCases.map {
+            AppFolders.transcripts.appendingPathComponent(TranscriptCache.key(for: url, model: $0.rawValue) + ".json")
+        }
+        ([url, converted] + transcripts).forEach { try? fileManager.removeItem(at: $0) }
     }
 
-    /// Deletes every tracked download with its converted copy and transcripts,
-    /// plus unfinished download pieces.
-    static func deleteAll() {
-        let fileManager = FileManager.default
-        for path in paths {
-            let url = URL(fileURLWithPath: path)
-            if fileManager.fileExists(atPath: path) {
-                // Keys depend on the file's size and date, so compute them before deleting it.
-                let converted = AppFolders.work.appendingPathComponent(TranscriptCache.key(for: url, model: "convert") + ".mp4")
-                let transcripts = WhisperModel.allCases.map {
-                    AppFolders.transcripts.appendingPathComponent(TranscriptCache.key(for: url, model: $0.rawValue) + ".json")
-                }
-                ([url, converted] + transcripts).forEach { try? fileManager.removeItem(at: $0) }
-            }
-        }
-        UserDefaults.standard.removeObject(forKey: key)
+    /// yt-dlp pieces of an unfinished download, e.g. "x.mp4.part" or "x.f137.mp4".
+    static func isPartialDownload(_ url: URL) -> Bool {
+        let name = url.lastPathComponent
+        return name.hasSuffix(".part") || name.hasSuffix(".ytdl")
+            || name.range(of: #"\.f\d+\.[a-z0-9]+$"#, options: .regularExpression) != nil
+    }
 
-        // yt-dlp leftovers from an interrupted download, e.g. "x.mp4.part" or "x.f137.mp4".
-        let leftovers = (try? fileManager.contentsOfDirectory(at: AppFolders.downloads, includingPropertiesForKeys: nil)) ?? []
-        for file in leftovers {
-            let name = file.lastPathComponent
-            if name.hasSuffix(".part") || name.hasSuffix(".ytdl")
-                || name.range(of: #"\.f\d+\.[a-z0-9]+$"#, options: .regularExpression) != nil {
-                try? fileManager.removeItem(at: file)
-            }
+    /// Removes pieces left by interrupted downloads (called when the app quits).
+    static func cleanDownloadLeftovers() {
+        let files = (try? FileManager.default.contentsOfDirectory(at: AppFolders.downloads, includingPropertiesForKeys: nil)) ?? []
+        for file in files where isPartialDownload(file) {
+            try? FileManager.default.removeItem(at: file)
         }
     }
 }

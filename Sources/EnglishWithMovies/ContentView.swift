@@ -8,6 +8,7 @@ struct ContentView: View {
     @EnvironmentObject private var translator: Translator
     @EnvironmentObject private var practice: PracticeStore
     @EnvironmentObject private var phonemes: PhonemeEngine
+    @EnvironmentObject private var library: LibraryStore
     @Environment(\.openWindow) private var openWindow
     @ViewState private var isDropTargeted = false
     @ViewState private var showLinkSheet = false
@@ -23,7 +24,11 @@ struct ContentView: View {
                     .background(.bar)
             }
             if model.mediaURL == nil {
-                DropZone(isTargeted: isDropTargeted, showLinkSheet: $showLinkSheet)
+                if library.items.isEmpty {
+                    DropZone(isTargeted: isDropTargeted, showLinkSheet: $showLinkSheet)
+                } else {
+                    LibraryView(showLinkSheet: $showLinkSheet)
+                }
             } else {
                 VSplitView {
                     PlayerArea()
@@ -51,6 +56,11 @@ struct ContentView: View {
             return true
         }
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button("Biblioteca", systemImage: "square.grid.2x2") { model.closeMedia() }
+                    .help("Voltar para a biblioteca")
+                    .disabled(model.mediaURL == nil)
+            }
             ToolbarItemGroup {
                 Picker("Modelo", selection: $model.model) {
                     ForEach(WhisperModel.allCases) { Text($0.title).tag($0) }
@@ -216,7 +226,7 @@ private struct LinkSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Baixar do YouTube").font(.title3.bold())
-            Text("Cole o link do vídeo. Ele é baixado, transcrito e apagado automaticamente quando você fecha o app.")
+            Text("Cole o link do vídeo. Ele é baixado, transcrito e fica salvo na sua biblioteca (Filmes › English with Movies).")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             TextField("https://www.youtube.com/watch?v=…", text: $link)

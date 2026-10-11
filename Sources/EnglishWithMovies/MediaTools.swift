@@ -57,6 +57,14 @@ final class MediaTools: @unchecked Sendable {
         ] + video + ["-c:a", "aac", "-movflags", "+faststart", output.path])
     }
 
+    /// Saves one video frame as a JPEG (used for library covers).
+    func extractFrame(from media: URL, at seconds: Double, to output: URL) async throws {
+        try await run("ffmpeg", [
+            "-y", "-loglevel", "error", "-ss", String(format: "%.1f", seconds), "-i", media.path,
+            "-frames:v", "1", "-vf", "scale=1280:-2", "-q:v", "4", output.path,
+        ])
+    }
+
     /// Downloads a YouTube (or other yt-dlp supported) video as .mp4 into `folder`.
     /// Returns the downloaded file.
     func downloadVideo(from link: String, to folder: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {

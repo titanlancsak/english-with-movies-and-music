@@ -26,6 +26,9 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(model.rawValue, forKey: "whisperModel") }
     }
 
+    let library = LibraryStore()
+    private var positionObserver: Any?
+
     let dictionary = DictionaryService(offlineLookup: { word in
         SystemDictionary.define(word).flatMap { SystemDictionaryParser.parse($0, fallbackWord: word) }
     })
@@ -62,9 +65,11 @@ final class AppModel: ObservableObject {
             return
         }
         pendingSeek = time
+        savePosition()
         cancel()
         tearDownPlayer()
         mediaURL = url
+        library.recordOpened(url)
         transcript = nil
         job = Task { await load(url, transcribe: true) }
     }
@@ -82,7 +87,6 @@ final class AppModel: ObservableObject {
                 let file = try await tools.downloadVideo(from: link, to: AppFolders.downloads) { value in
                     Task { @MainActor in self.updateProgress(value) }
                 }
-                DownloadedFiles.add(file)
                 try Task.checkCancellation()
                 open(file)
             } catch {
@@ -142,11 +146,25 @@ final class AppModel: ObservableObject {
         removableCopies().forEach { try? FileManager.default.removeItem(at: $0) }
     }
 
-    /// Stops everything and deletes the videos downloaded from links (called when quitting).
-    func deleteDownloads() {
+    /// Closes the movie or song and goes back to the library.
+    func closeMedia() {
+        savePosition()
         cancel()
         tearDownPlayer()
-        DownloadedFiles.deleteAll()
+        mediaURL = nil
+        transcript = nil
+        hasVideo = false
+        status = .idle
+        library.refresh()
+    }
+
+    /// Remembers where playback stopped (called when switching media and when quitting).
+    func savePosition() {
+        if let mediaURL, let player {
+            library.updatePosition(mediaURL, seconds: player.currentTime().seconds,
+                                   duration: player.currentItem?.duration.seconds)
+        }
+        library.save()
     }
 
     func cancel() {
@@ -312,6 +330,14 @@ final class AppModel: ObservableObject {
             player.seek(to: CMTime(seconds: pendingSeek, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
             self.pendingSeek = nil
         }
+        positionObserver = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 5, preferredTimescale: 600), queue: .main
+        ) { [weak self] time in
+            MainActor.assumeIsolated {
+                guard let self, let url = self.mediaURL else { return }
+                self.library.updatePosition(url, seconds: time.seconds, duration: self.player?.currentItem?.duration.seconds)
+            }
+        }
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             MainActor.assumeIsolated { self?.updateActive(time.seconds) }
         }
@@ -321,7 +347,9 @@ final class AppModel: ObservableObject {
     private func tearDownPlayer() {
         stopSegment()
         if let timeObserver { player?.removeTimeObserver(timeObserver) }
+        if let positionObserver { player?.removeTimeObserver(positionObserver) }
         timeObserver = nil
+        positionObserver = nil
         player?.pause()
         player = nil
         playbackURL = nil

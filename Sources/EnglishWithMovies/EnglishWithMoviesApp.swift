@@ -14,6 +14,7 @@ struct EnglishWithMoviesApp: App {
         WindowGroup("English with Movies & Music") {
             ContentView()
                 .environmentObject(model)
+                .environmentObject(model.library)
                 .environmentObject(savedWords)
                 .environmentObject(translator)
                 .environmentObject(practice)
@@ -86,15 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
-    /// Deletes downloaded videos. Downloads left behind by a crash are still on the
-    /// list, so they go too. (Not done at launch: files opened from Finder arrive later.)
+    /// Saves where playback stopped and removes pieces of unfinished downloads.
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
-            if let model {
-                model.deleteDownloads()
-            } else {
-                DownloadedFiles.deleteAll()
-            }
+            model?.savePosition()
+            MediaFiles.cleanDownloadLeftovers()
         }
     }
 

@@ -4,6 +4,7 @@
 
 Aplicativo de macOS para aprender inglês com filmes e músicas.
 
+- **Biblioteca estilo Netflix** ao abrir o app: destaque com o último conteúdo, fileiras de capas (Continuar assistindo, Baixados do YouTube, Filmes e vídeos, Músicas) e o vídeo continua de onde você parou.
 - **Arraste um filme ou uma música** para a janela. O app transcreve todas as falas no seu Mac, sem internet e sem custo.
 - **A legenda aparece abaixo do vídeo**: a fala atual fica em **negrito** e a palavra que está sendo dita é destacada em tempo real.
 - **Clique em qualquer palavra** para ver o significado no dicionário, a pronúncia e até **3 exemplos de frases**. Quando o dicionário tem menos de 3 exemplos, o app completa com falas do próprio filme ou da própria música.
@@ -13,7 +14,7 @@ Aplicativo de macOS para aprender inglês com filmes e músicas.
 - **Salve palavras** (🔖 no popup) para revisar depois. A lista guarda o significado, a frase em que a palavra apareceu e o filme. Ela também volta direto para o trecho e exporta **CSV** (com a tradução) para o Anki (⇧⌘S abre a lista).
 - Descrições de som como `[Music]`, `(background music playing)` e `♪` são removidas da legenda.
 - Clique no horário de uma fala para pular até ela.
-- **Baixe vídeos do YouTube** colando o link. O vídeo baixado é **apagado automaticamente quando você fecha o app**, junto com a cópia convertida e a transcrição.
+- **Baixe vídeos do YouTube** colando o link. Eles ficam na biblioteca (pasta `~/Movies/English with Movies`); passe o mouse na capa e clique na 🗑 para apagar o vídeo, a cópia convertida e a transcrição.
 - Já tem a legenda? Importe um `.srt` e a transcrição é pulada.
 
 ## Como funciona
