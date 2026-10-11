@@ -83,7 +83,7 @@ Requisitos: macOS 14 (Sonoma) ou mais novo · Apple Silicon (M1/M2/M3…) ou Int
 
 ### 🪟 Windows
 
-Requisitos: Windows 10 ou 11 (64 bits). Não precisa instalar mais nada: as ferramentas já vêm junto.
+Requisitos: Windows 10 ou 11 (64 bits). Não precisa instalar mais nada: as ferramentas e o modelo de transcrição já vêm junto (por isso o download tem uns 280 MB).
 
 1. Baixe **[EnglishWithMovies-Windows.zip](https://github.com/titanlancsak/english-with-movies-and-music/releases/latest/download/EnglishWithMovies-Windows.zip)**.
 2. Clique com o botão direito no arquivo › **Extrair tudo…** e escolha uma pasta (por exemplo, Documentos).
@@ -93,7 +93,7 @@ Requisitos: Windows 10 ou 11 (64 bits). Não precisa instalar mais nada: as ferr
 ### Primeiro uso (Mac e Windows)
 
 - Arraste um filme ou música para a janela, clique em **Escolher arquivo…** ou em **Baixar do YouTube…**.
-- Na primeira transcrição o app baixa o modelo de reconhecimento de voz (**148 MB**, uma vez só). Modelos maiores, mais precisos, podem ser escolhidos no topo da janela.
+- No Mac, a primeira transcrição baixa o modelo de reconhecimento de voz (**148 MB**, uma vez só); no Windows ele já vem no pacote. Modelos maiores, mais precisos, podem ser escolhidos no topo da janela.
 - Um filme de 2 horas leva de 10 a 30 minutos para ser transcrito (depende do computador); você pode assistir enquanto isso. Cada arquivo é transcrito uma vez só.
 
 ### Atalhos (Mac)

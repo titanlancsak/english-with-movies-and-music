@@ -51,11 +51,11 @@ class MediaTools {
 
   /// Converts the media's audio to 16 kHz mono WAV, the format Whisper expects.
   Future<void> extractAudio(String media, String wav) =>
-      _run('ffmpeg', ['-y', '-loglevel', 'error', '-i', media, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wav]);
+      _run('ffmpeg', ['-nostdin', '-y', '-loglevel', 'error', '-i', media, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wav]);
 
   /// One video frame as JPEG, for library covers.
   Future<void> extractFrame(String media, double seconds, String output) => _run('ffmpeg', [
-        '-y', '-loglevel', 'error', '-ss', seconds.toStringAsFixed(1), '-i', media,
+        '-nostdin', '-y', '-loglevel', 'error', '-ss', seconds.toStringAsFixed(1), '-i', media,
         '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', output,
       ]);
 
@@ -131,7 +131,10 @@ class MediaTools {
     }
     if (_cancelled) throw CancelledException();
     final process = await Process.start(executable, arguments);
+    // Nothing is sent to the tools; an open stdin makes ffmpeg wait for keyboard commands forever.
+    unawaited(process.stdin.close());
     _running = process;
+    log('Executando $tool');
     final log = StringBuffer();
     StreamSubscription<String> listen(Stream<List<int>> stream) => stream
         .transform(const Utf8Decoder(allowMalformed: true))
