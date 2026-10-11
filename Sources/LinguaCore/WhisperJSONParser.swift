@@ -46,6 +46,7 @@ public enum WhisperJSONParser {
         }
 
         return Transcript(lines: LineBuilder.build(words: words, segmentBreaks: segmentBreaks))
+            .removingSoundAnnotations()
     }
 
     private static func isPunctuation(_ text: String) -> Bool {

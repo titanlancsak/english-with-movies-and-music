@@ -75,6 +75,7 @@ final class AppModel: ObservableObject {
                 let file = try await tools.downloadVideo(from: link, to: AppFolders.downloads) { value in
                     Task { @MainActor in self.updateProgress(value) }
                 }
+                DownloadedFiles.add(file)
                 try Task.checkCancellation()
                 open(file)
             } catch {
@@ -132,6 +133,13 @@ final class AppModel: ObservableObject {
     func clearConvertedCopies() {
         guard !isBusy else { return }
         removableCopies().forEach { try? FileManager.default.removeItem(at: $0) }
+    }
+
+    /// Stops everything and deletes the videos downloaded from links (called when quitting).
+    func deleteDownloads() {
+        cancel()
+        tearDownPlayer()
+        DownloadedFiles.deleteAll()
     }
 
     func cancel() {

@@ -92,6 +92,8 @@ final class MediaTools: @unchecked Sendable {
         try await run("whisper-cli", [
             "-m", model.path, "-f", wav.path, "-l", "en",
             "-t", String(threads), "-ojf", "-of", outputBase.path, "-pp",
+            // Suppress non-speech tokens such as "[Music]" or "(applause)".
+            "--suppress-nst",
         ]) { line in
             // whisper-cli prints e.g. "whisper_print_progress_callback: progress =  42%"
             guard let range = line.range(of: "progress =") else { return }

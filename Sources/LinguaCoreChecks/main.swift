@@ -123,5 +123,31 @@ check(WordList(words: [SavedWord(word: "storm", translation: "tempestade")]).fil
 let oldFormat = #"{"words":[{"key":"robot","word":"robot","dateAdded":0}]}"#
 check((try? JSONDecoder().decode(WordList.self, from: Data(oldFormat.utf8)))?.words.first?.translation == nil, "saved words: lists saved before translations still load")
 
+// MARK: Sound annotations
+
+func words(_ text: String) -> [TimedWord] {
+    text.split(separator: " ").enumerated().map { TimedWord(text: String($1), start: Double($0), end: Double($0) + 0.5) }
+}
+check(SoundAnnotationFilter.clean(words("(background music playing) Hello there.")).map(\.text) == ["Hello", "there."], "sound: multi-word description")
+check(SoundAnnotationFilter.clean(words("[Music]. I can't [BLANK_AUDIO] go *sighs* now")).map(\.text) == ["I", "can't", "go", "now"], "sound: single-word tags and trailing punctuation")
+check(SoundAnnotationFilter.clean(words("♪ We sing along ♪")).map(\.text) == ["We", "sing", "along"], "sound: music symbols")
+check(SoundAnnotationFilter.clean(words("♪Hey♪ you")).map(\.text) == ["Hey", "you"], "sound: music symbols glued to words")
+
+check(SoundAnnotationFilter.clean(words("(well I think we should leave now before the storm hits the harbor and the boats sink")).count == 17, "sound: unclosed bracket keeps the speech")
+check(SoundAnnotationFilter.clean(words("We're out.[MUSIC PLAYING][MUSIC PLAYING] No.(dramatic music)(dramatic music) Go")).map(\.text) == ["We're", "out.", "No.", "Go"], "sound: annotations glued to words")
+check(SoundAnnotationFilter.clean(words("What the f*ck is that")).count == 5, "sound: asterisk inside a word is kept")
+
+let noisy = Transcript(lines: [
+    TranscriptLine(id: 0, start: 0, end: 2, words: words("[Music]")),
+    TranscriptLine(id: 1, start: 3, end: 6, words: [
+        TimedWord(text: "(door", start: 3, end: 3.5), TimedWord(text: "slams)", start: 3.5, end: 4),
+        TimedWord(text: "Who's", start: 4.5, end: 5), TimedWord(text: "there?", start: 5, end: 6),
+    ]),
+])
+let quiet = noisy.removingSoundAnnotations()
+check(quiet.lines.map(\.text) == ["Who's there?"], "sound: empty lines removed")
+check(quiet.lines.first?.id == 0 && quiet.lines.first?.start == 4.5, "sound: line ids and timing updated")
+check(SRTParser.parse("1\n00:00:01,000 --> 00:00:02,000\n[THUNDER RUMBLES]\n\n2\n00:00:03,000 --> 00:00:04,000\nRun!\n").lines.map(\.text) == ["Run!"], "sound: SRT annotations removed")
+
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
 exit(failures == 0 ? 0 : 1)

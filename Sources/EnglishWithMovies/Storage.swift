@@ -28,6 +28,45 @@ enum AppFolders {
     }
 }
 
+/// Videos the app downloaded from links. They are deleted when the app quits.
+enum DownloadedFiles {
+    private static let key = "downloadedFiles"
+
+    static var paths: [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+
+    static func add(_ url: URL) {
+        UserDefaults.standard.set(paths + [url.path], forKey: key)
+    }
+
+    /// Deletes every tracked download with its converted copy and transcripts,
+    /// plus unfinished download pieces.
+    static func deleteAll() {
+        let fileManager = FileManager.default
+        for path in paths {
+            let url = URL(fileURLWithPath: path)
+            if fileManager.fileExists(atPath: path) {
+                // Keys depend on the file's size and date, so compute them before deleting it.
+                let converted = AppFolders.work.appendingPathComponent(TranscriptCache.key(for: url, model: "convert") + ".mp4")
+                let transcripts = WhisperModel.allCases.map {
+                    AppFolders.transcripts.appendingPathComponent(TranscriptCache.key(for: url, model: $0.rawValue) + ".json")
+                }
+                ([url, converted] + transcripts).forEach { try? fileManager.removeItem(at: $0) }
+            }
+        }
+        UserDefaults.standard.removeObject(forKey: key)
+
+        // yt-dlp leftovers from an interrupted download, e.g. "x.mp4.part" or "x.f137.mp4".
+        let leftovers = (try? fileManager.contentsOfDirectory(at: AppFolders.downloads, includingPropertiesForKeys: nil)) ?? []
+        for file in leftovers {
+            let name = file.lastPathComponent
+            if name.hasSuffix(".part") || name.hasSuffix(".ytdl")
+                || name.range(of: #"\.f\d+\.[a-z0-9]+$"#, options: .regularExpression) != nil {
+                try? fileManager.removeItem(at: file)
+            }
+        }
+    }
+}
+
 /// Saves transcripts so each movie/song is only transcribed once.
 enum TranscriptCache {
     static func key(for media: URL, model: String) -> String {
@@ -41,7 +80,8 @@ enum TranscriptCache {
     static func load(key: String) -> Transcript? {
         let url = AppFolders.transcripts.appendingPathComponent("\(key).json")
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(Transcript.self, from: data)
+        // Also cleans transcripts saved before sound annotations were filtered.
+        return (try? JSONDecoder().decode(Transcript.self, from: data))?.removingSoundAnnotations()
     }
 
     static func save(_ transcript: Transcript, key: String) {

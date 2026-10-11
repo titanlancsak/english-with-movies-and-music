@@ -9,8 +9,9 @@ Aplicativo de macOS para aprender inglês com filmes e músicas.
 - **Clique em qualquer palavra** para ver o significado no dicionário, a pronúncia e até **3 exemplos de frases**. Quando o dicionário tem menos de 3 exemplos, o app completa com falas do próprio filme ou da própria música.
 - **Tradução para português**: o botão "Tradução" mostra a tradução embaixo de cada fala, e o popup da palavra traduz a palavra e a frase. Tudo roda no próprio Mac, sem internet depois do primeiro download do idioma.
 - **Salve palavras** (🔖 no popup) para revisar depois. A lista guarda o significado, a frase em que a palavra apareceu e o filme. Ela também volta direto para o trecho e exporta **CSV** (com a tradução) para o Anki (⇧⌘S abre a lista).
+- Descrições de som como `[Music]`, `(background music playing)` e `♪` são removidas da legenda.
 - Clique no horário de uma fala para pular até ela.
-- **Baixe vídeos do YouTube** colando o link. Eles são salvos em `~/Movies/English with Movies`.
+- **Baixe vídeos do YouTube** colando o link. O vídeo baixado é **apagado automaticamente quando você fecha o app**, junto com a cópia convertida e a transcrição.
 - Já tem a legenda? Importe um `.srt` e a transcrição é pulada.
 
 ## Como funciona
@@ -74,6 +75,7 @@ Sources/
     Transcript.swift         modelo de falas e palavras com tempo
     WhisperJSONParser.swift  lê a saída do whisper.cpp
     SRTParser.swift          importa legendas .srt
+    SoundAnnotations.swift   remove descrições de som ([Music], ♪...)
     Dictionary.swift         dicionário, normalização de palavras
     SavedWords.swift         lista de palavras salvas e exportação CSV
   EnglishWithMovies/   app macOS (SwiftUI)

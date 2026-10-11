@@ -72,6 +72,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
 
+    /// Deletes downloaded videos. Downloads left behind by a crash are still on the
+    /// list, so they go too. (Not done at launch: files opened from Finder arrive later.)
+    func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            if let model {
+                model.deleteDownloads()
+            } else {
+                DownloadedFiles.deleteAll()
+            }
+        }
+    }
+
     @MainActor
     func application(_ application: NSApplication, open urls: [URL]) {
         if model != nil {

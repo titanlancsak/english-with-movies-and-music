@@ -204,7 +204,7 @@ private struct LinkSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Baixar do YouTube").font(.title3.bold())
-            Text("Cole o link do vídeo. Ele é salvo em Filmes › English with Movies e transcrito em seguida.")
+            Text("Cole o link do vídeo. Ele é baixado, transcrito e apagado automaticamente quando você fecha o app.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             TextField("https://www.youtube.com/watch?v=…", text: $link)

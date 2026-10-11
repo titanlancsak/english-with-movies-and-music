@@ -31,7 +31,7 @@ public enum SRTParser {
                 words: spread(tokens, from: start, to: end)
             ))
         }
-        return Transcript(lines: lines)
+        return Transcript(lines: lines).removingSoundAnnotations()
     }
 
     /// "00:01:02,500" -> 62.5
