@@ -1,3 +1,5 @@
+<img src="Resources/AppIcon.png" width="128" alt="Ícone do app">
+
 # English with Movies & Music
 
 Aplicativo de macOS para aprender inglês com filmes e músicas.
@@ -76,7 +78,9 @@ Sources/
     SavedWords.swift         lista de palavras salvas e exportação CSV
   EnglishWithMovies/   app macOS (SwiftUI)
   LinguaCoreChecks/    verificações automáticas
+Resources/AppIcon.*    ícone do app (gerado por scripts/make-icon.swift)
 scripts/build-app.sh   empacota o .app
+scripts/make-icon.swift  desenha o ícone: swift scripts/make-icon.swift
 ```
 
 ## Próximos passos
