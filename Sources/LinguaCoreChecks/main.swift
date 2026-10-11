@@ -55,6 +55,7 @@ check(transcript.lineIndex(at: 1.7) == 0 && transcript.lines[0].wordIndex(at: 1.
 check(transcript.lineIndex(at: 4) == 0, "transcript: line stays briefly after it ends")
 check(transcript.lineIndex(at: 7) == nil, "transcript: clears during long silence")
 check(transcript.lineIndex(at: 11) == 1, "transcript: later line")
+check(transcript.nearestLineIndex(at: 7) == 0 && transcript.nearestLineIndex(at: 0) == 0 && transcript.nearestLineIndex(at: 50) == 1, "transcript: nearest line for jumps into silence")
 check(transcript.lines(containing: "MORNING!", limit: 3).map(\.id) == [0, 1], "transcript: finds lines with a word")
 check(transcript.lines(containing: "morning", limit: 1).map(\.id) == [0], "transcript: respects limit")
 

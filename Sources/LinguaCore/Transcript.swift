@@ -70,6 +70,13 @@ public struct Transcript: Codable, Hashable, Sendable {
         return time <= lines[index].end + 2 ? index : nil
     }
 
+    /// The line to show at `time`: the one being spoken, or the last one before it,
+    /// or the first line when nothing was said yet. Used to scroll after a jump.
+    public func nearestLineIndex(at time: Double) -> Int? {
+        guard !lines.isEmpty else { return nil }
+        return lines.lastIndex { $0.start <= time } ?? 0
+    }
+
     /// Lines that contain the given word (case and punctuation insensitive).
     public func lines(containing word: String, limit: Int) -> [TranscriptLine] {
         let key = WordNormalizer.lookupKey(word)

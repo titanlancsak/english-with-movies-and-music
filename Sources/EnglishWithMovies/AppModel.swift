@@ -20,6 +20,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var activeLine: Int?
     @Published private(set) var activeWord: Int?
     @Published var followPlayback = true
+    /// Incremented when the subtitles must jump to `scrollLine` (after the video jumps).
+    @Published private(set) var scrollRequest = 0
+    private(set) var scrollLine: Int?
+    private var lastObservedTime: Double?
     /// The line being practiced (shows the practice sheet).
     @Published var practiceLine: TranscriptLine?
     @Published var model: WhisperModel {
@@ -266,7 +270,7 @@ final class AppModel: ObservableObject {
 
     func seek(to seconds: Double) {
         player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-        followPlayback = true
+        jumpSubtitles(to: seconds)
     }
 
     func pause() {
@@ -353,13 +357,27 @@ final class AppModel: ObservableObject {
         player?.pause()
         player = nil
         playbackURL = nil
+        lastObservedTime = nil
         activeLine = nil
         activeWord = nil
+    }
+
+    /// Follows playback again and scrolls the subtitles to the line at `time`.
+    private func jumpSubtitles(to time: Double) {
+        followPlayback = true
+        scrollLine = transcript?.nearestLineIndex(at: time)
+        scrollRequest += 1
     }
 
     /// Only publishes when the highlighted line/word actually changes, to keep the UI light.
     private func updateActive(_ time: Double) {
         guard let transcript else { return }
+        // A jump: the slider, the skip buttons, a click on a line... anything but normal playback
+        // (the observer runs every 0.05 s, so normal playback moves far less than a second).
+        if let last = lastObservedTime, abs(time - last) > 1 {
+            jumpSubtitles(to: time)
+        }
+        lastObservedTime = time
         let line = transcript.lineIndex(at: time)
         let word = line.flatMap { transcript.lines[$0].wordIndex(at: time) }
         if line != activeLine { activeLine = line }

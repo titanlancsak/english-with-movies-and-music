@@ -44,6 +44,12 @@ struct TranscriptView: View {
                 guard model.followPlayback, let line else { return }
                 withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(line, anchor: .center) }
             }
+            .onChange(of: model.scrollRequest) { _, _ in
+                guard let line = model.scrollLine else { return }
+                // Far rows of a lazy list are only estimated, so scroll again once they exist.
+                proxy.scrollTo(line, anchor: .center)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { proxy.scrollTo(line, anchor: .center) }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if !model.followPlayback {
                     Button("Voltar para a fala atual", systemImage: "text.line.first.and.arrowtriangle.forward") {
