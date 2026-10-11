@@ -81,25 +81,37 @@ jobs:
           python-version: '3.12'
 
       - name: Bundle the sound analysis (espeak-ng and the phoneme worker)
+        timeout-minutes: 15
         run: |
           $tools = "build/windows/x64/runner/Release/tools"
 
           # espeak-ng: the MSI is unpacked (administrative install), nothing is installed on the machine.
+          Write-Host "Downloading espeak-ng $env:ESPEAK_RELEASE"
           Invoke-WebRequest "https://github.com/espeak-ng/espeak-ng/releases/download/$env:ESPEAK_RELEASE/espeak-ng.msi" -OutFile downloads/espeak-ng.msi
-          $unpacked = "$env:RUNNER_TEMP/espeak-ng"
-          Start-Process msiexec -ArgumentList "/a `"$((Resolve-Path downloads/espeak-ng.msi).Path)`" /qn TARGETDIR=`"$unpacked`"" -Wait
+          $msi = (Resolve-Path downloads/espeak-ng.msi).Path
+          $unpacked = "$env:RUNNER_TEMP\espeak-ng"
+          Write-Host "Unpacking $msi"
+          $msiexec = Start-Process msiexec.exe -ArgumentList "/a `"$msi`" /qn TARGETDIR=`"$unpacked`" /l*v `"$env:RUNNER_TEMP\espeak-msi.log`"" -PassThru
+          if (-not $msiexec.WaitForExit(180000)) {
+            Get-Content "$env:RUNNER_TEMP\espeak-msi.log" -Tail 40 -ErrorAction SilentlyContinue
+            throw "msiexec did not finish"
+          }
+          Write-Host "msiexec exit code: $($msiexec.ExitCode)"
           $espeak = Get-ChildItem $unpacked -Recurse -Filter espeak-ng.exe | Select-Object -First 1
+          if (-not $espeak) { Get-ChildItem $unpacked -Recurse | Select-Object -First 30 FullName; throw "espeak-ng.exe not found in the MSI" }
           New-Item -ItemType Directory -Force "$tools/espeak-ng" | Out-Null
           Copy-Item "$($espeak.DirectoryName)/*" "$tools/espeak-ng" -Recurse
           & "$tools/espeak-ng/espeak-ng.exe" "--path=$tools/espeak-ng" -q -v en-us --ipa --sep=_ "think big"
 
           # The phoneme worker (the Mac app's worker.py) as a standalone program: no Python needed on the user's PC.
+          Write-Host "Building the phoneme worker"
           python -m pip install --quiet pyinstaller "onnxruntime>=1.20" "numpy>=1.26"
           python -m PyInstaller --noconfirm --onedir --name phonemes --distpath downloads/pyinstaller --workpath "$env:RUNNER_TEMP/pyinstaller" ../Sources/EnglishWithMovies/Phonemes/worker.py
           Copy-Item downloads/pyinstaller/phonemes $tools -Recurse
           Get-ChildItem "$tools/phonemes" | Select-Object -First 5
 
       - name: Sound analysis test (speech -> worker + espeak-ng, model downloaded from the release)
+        timeout-minutes: 15
         run: |
           $env:TOOLS_DIR = (Resolve-Path "build/windows/x64/runner/Release/tools").Path
           $env:PHONEME_DOWNLOAD = '1'
