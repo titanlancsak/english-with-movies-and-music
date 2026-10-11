@@ -9,7 +9,7 @@ enum MediaToolError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .toolMissing(let name):
-            "Não encontrei o programa \"\(name)\". Instale com: brew install ffmpeg whisper-cpp"
+            "Não encontrei o programa \"\(name)\". Instale com: brew install ffmpeg whisper-cpp yt-dlp"
         case .failed(let name, let output):
             "\(name) falhou:\n\(output.suffix(600))"
         case .cancelled:
@@ -48,12 +48,41 @@ final class MediaTools: @unchecked Sendable {
     }
 
     /// Repackages formats AVPlayer cannot open (e.g. .mkv) into .mp4.
-    func remuxToMP4(_ media: URL, to output: URL) async throws {
+    /// With `transcodeVideo`, also converts the picture to H.264 (for codecs like VP9 or AV1).
+    func convertToMP4(_ media: URL, to output: URL, transcodeVideo: Bool) async throws {
+        let video = transcodeVideo ? ["-c:v", "h264_videotoolbox", "-b:v", "6M"] : ["-c:v", "copy"]
         try await run("ffmpeg", [
             "-y", "-loglevel", "error", "-i", media.path,
             "-map", "0:v:0?", "-map", "0:a:0?", "-sn",
-            "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", output.path,
-        ])
+        ] + video + ["-c:a", "aac", "-movflags", "+faststart", output.path])
+    }
+
+    /// Downloads a YouTube (or other yt-dlp supported) video as .mp4 into `folder`.
+    /// Returns the downloaded file.
+    func downloadVideo(from link: String, to folder: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+        let output = OutputBuffer()
+        try await run("yt-dlp", [
+            "--no-playlist", "--newline", "--progress", "--no-update",
+            // Prefer H.264 + AAC (plays natively on every Mac), up to 1080p.
+            "-S", "res:1080,vcodec:h264,acodec:aac",
+            "--merge-output-format", "mp4",
+            "--ffmpeg-location", Self.locate("ffmpeg")?.path ?? "ffmpeg",
+            "-o", folder.appendingPathComponent("%(title).120B [%(id)s].%(ext)s").path,
+            "--print", "after_move:FILE:%(filepath)s",
+            link,
+        ]) { line in
+            // "[download]  42.3% of 120.00MiB at 3.2MiB/s ETA 00:30"
+            if line.hasPrefix("FILE:") {
+                output.append(String(line.dropFirst(5)))
+            } else if line.hasPrefix("[download]"), let percent = line.split(separator: " ").first(where: { $0.hasSuffix("%") }) {
+                if let value = Double(percent.dropLast()) { progress(value / 100) }
+            }
+        }
+        let path = output.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else {
+            throw MediaToolError.failed("yt-dlp", "O download terminou, mas o arquivo não foi encontrado.")
+        }
+        return URL(fileURLWithPath: path)
     }
 
     /// Runs Whisper and returns the parsed transcript.

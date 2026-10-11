@@ -29,20 +29,27 @@ struct EnglishWithMoviesApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Files received before the window (and model) exist, e.g. "Open With" from Finder.
+    /// Files or links received before the window (and model) exist, e.g. "Open With" from Finder.
     private var pending: [URL] = []
 
     @MainActor var model: AppModel? {
-        didSet { pending.forEach { model?.open($0) }; pending = [] }
+        didSet { pending.forEach(handle); pending = [] }
+    }
+
+    @MainActor
+    private func handle(_ url: URL) {
+        if url.isFileURL { model?.open(url) } else { model?.download(from: url.absoluteString) }
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Needed when launched as a plain executable (swift run) instead of a .app bundle.
         NSApplication.shared.setActivationPolicy(.regular)
-        // `swift run EnglishWithMovies movie.mp4` opens the file directly.
-        pending = CommandLine.arguments.dropFirst()
-            .filter { !$0.hasPrefix("-") && FileManager.default.fileExists(atPath: $0) }
-            .map { URL(fileURLWithPath: $0) }
+        // `swift run EnglishWithMovies movie.mp4` opens the file directly;
+        // `swift run EnglishWithMovies https://youtube.com/...` downloads it first.
+        pending = CommandLine.arguments.dropFirst().compactMap { argument in
+            if argument.hasPrefix("http") { return URL(string: argument) }
+            return FileManager.default.fileExists(atPath: argument) ? URL(fileURLWithPath: argument) : nil
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -51,8 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     func application(_ application: NSApplication, open urls: [URL]) {
-        if let model {
-            urls.forEach { model.open($0) }
+        if model != nil {
+            urls.forEach(handle)
         } else {
             pending += urls
         }

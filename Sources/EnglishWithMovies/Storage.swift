@@ -13,6 +13,14 @@ enum AppFolders {
     static let transcripts = folder("transcripts")
     static let work = folder("work")
 
+    /// Videos downloaded from links, kept where the user can find them.
+    static let downloads: URL = {
+        let movies = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask)[0]
+        let url = movies.appendingPathComponent("English with Movies", isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }()
+
     private static func folder(_ name: String) -> URL {
         let url = root.appendingPathComponent(name, isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

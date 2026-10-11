@@ -51,6 +51,27 @@ final class AppModel: ObservableObject {
         job = Task { await load(url, transcribe: true) }
     }
 
+    /// Downloads a video from a YouTube link, then opens and transcribes it.
+    func download(from link: String) {
+        let link = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !link.isEmpty else { return }
+        cancel()
+        job = Task {
+            let tools = MediaTools()
+            self.tools = tools
+            status = .working("Baixando o vídeo…", progress: 0)
+            do {
+                let file = try await tools.downloadVideo(from: link, to: AppFolders.downloads) { value in
+                    Task { @MainActor in self.updateProgress(value) }
+                }
+                try Task.checkCancellation()
+                open(file)
+            } catch {
+                report(error)
+            }
+        }
+    }
+
     /// Uses an existing .srt instead of transcribing (instant, and exact text if the subtitle is good).
     func importSubtitles(_ url: URL) {
         guard let contents = (try? String(contentsOf: url, encoding: .utf8))
@@ -86,14 +107,21 @@ final class AppModel: ObservableObject {
             var playableURL = url
             let asset = AVURLAsset(url: url)
             let playable = (try? await asset.load(.isPlayable)) ?? false
-            if !playable {
+            // e.g. VP9/AV1 video: the file opens, but only the sound plays.
+            var videoDecodable = true
+            for track in (try? await asset.loadTracks(withMediaType: .video)) ?? [] {
+                if !((try? await track.load(.isDecodable)) ?? true) { videoDecodable = false }
+            }
+            if !playable || !videoDecodable {
                 status = .working("Convertendo o arquivo para um formato compatível…", progress: nil)
                 let output = AppFolders.work.appendingPathComponent(
-                    TranscriptCache.key(for: url, model: "remux") + ".mp4")
+                    TranscriptCache.key(for: url, model: "convert") + ".mp4")
                 if !FileManager.default.fileExists(atPath: output.path) {
                     let tools = MediaTools()
                     self.tools = tools
-                    try await tools.remuxToMP4(url, to: output)
+                    let partial = output.deletingPathExtension().appendingPathExtension("partial.mp4")
+                    try await tools.convertToMP4(url, to: partial, transcodeVideo: !videoDecodable)
+                    try FileManager.default.moveItem(at: partial, to: output)
                 }
                 playableURL = output
             }

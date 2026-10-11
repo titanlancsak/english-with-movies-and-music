@@ -5,22 +5,24 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @ViewState private var isDropTargeted = false
+    @ViewState private var showLinkSheet = false
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
+            StatusBar()
             if model.mediaURL == nil {
-                DropZone(isTargeted: isDropTargeted)
+                DropZone(isTargeted: isDropTargeted, showLinkSheet: $showLinkSheet)
             } else {
                 VSplitView {
                     PlayerArea()
                         .frame(minHeight: 180, idealHeight: 380)
-                    VStack(spacing: 0) {
-                        StatusBar()
-                        TranscriptView()
-                    }
-                    .frame(minHeight: 200)
+                    TranscriptView()
+                        .frame(minHeight: 200)
                 }
             }
+        }
+        .sheet(isPresented: $showLinkSheet) {
+            LinkSheet { link in model.download(from: link) }
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             guard let provider = providers.first else { return false }
@@ -38,6 +40,8 @@ struct ContentView: View {
                 .help("Modelo de transcrição: os maiores são mais precisos e mais lentos")
                 Button("Transcrever de novo", systemImage: "arrow.clockwise") { model.retranscribe() }
                     .disabled(model.mediaURL == nil)
+                Button("Baixar do YouTube", systemImage: "link") { showLinkSheet = true }
+                    .help("Baixar um vídeo a partir de um link do YouTube")
                 Button("Importar legenda", systemImage: "captions.bubble") { FilePicker.openSubtitles(model) }
                 Button("Abrir", systemImage: "folder") { FilePicker.openMedia(model) }
             }
@@ -49,6 +53,7 @@ struct ContentView: View {
 private struct DropZone: View {
     @EnvironmentObject private var model: AppModel
     let isTargeted: Bool
+    @Binding var showLinkSheet: Bool
 
     var body: some View {
         VStack(spacing: 16) {
@@ -60,9 +65,12 @@ private struct DropZone: View {
             Text("O app transcreve as falas, mostra a legenda em tempo real\ne explica qualquer palavra em que você clicar.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Button("Escolher arquivo…") { FilePicker.openMedia(model) }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
+            HStack {
+                Button("Escolher arquivo…") { FilePicker.openMedia(model) }
+                    .buttonStyle(.borderedProminent)
+                Button("Baixar do YouTube…") { showLinkSheet = true }
+            }
+            .controlSize(.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
@@ -119,7 +127,9 @@ private struct StatusBar: View {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 Text(message).textSelection(.enabled)
                 Spacer()
-                Button("Tentar de novo") { model.retranscribe() }
+                if model.mediaURL != nil {
+                    Button("Tentar de novo") { model.retranscribe() }
+                }
             }
             .padding(10)
             .background(.bar)
@@ -143,5 +153,46 @@ private struct PlayerView: NSViewRepresentable {
 
     func updateNSView(_ view: AVPlayerView, context: Context) {
         if view.player !== player { view.player = player }
+    }
+}
+
+/// Asks for a video link (YouTube or any site supported by yt-dlp).
+private struct LinkSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ViewState private var link = ""
+    let onDownload: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Baixar do YouTube").font(.title3.bold())
+            Text("Cole o link do vídeo. Ele é salvo em Filmes › English with Movies e transcrito em seguida.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            TextField("https://www.youtube.com/watch?v=…", text: $link)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(download)
+            HStack {
+                Spacer()
+                Button("Cancelar", role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Baixar", action: download)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(URL(string: link.trimmingCharacters(in: .whitespaces))?.host == nil)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
+        .onAppear {
+            // Pre-fill with a link from the clipboard, if there is one.
+            if let copied = NSPasteboard.general.string(forType: .string), copied.hasPrefix("http") {
+                link = copied
+            }
+        }
+    }
+
+    private func download() {
+        guard URL(string: link.trimmingCharacters(in: .whitespaces))?.host != nil else { return }
+        onDownload(link)
+        dismiss()
     }
 }
