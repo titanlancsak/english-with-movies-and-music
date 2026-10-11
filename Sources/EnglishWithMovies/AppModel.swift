@@ -33,6 +33,8 @@ final class AppModel: ObservableObject {
     private var timeObserver: Any?
     /// The file the player is using: the original, or a converted copy in the work folder.
     private var playbackURL: URL?
+    /// Where to start playing once the player is ready.
+    private var pendingSeek: Double?
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "whisperModel")
@@ -41,11 +43,18 @@ final class AppModel: ObservableObject {
 
     // MARK: - Opening files
 
-    func open(_ url: URL) {
+    /// Opens a movie or song. `time` jumps to that moment (used by saved words).
+    func open(_ url: URL, at time: Double? = nil) {
         if url.pathExtension.lowercased() == "srt" {
             importSubtitles(url)
             return
         }
+        if let time, player != nil, url.standardizedFileURL == mediaURL?.standardizedFileURL {
+            seek(to: time)
+            player?.play()
+            return
+        }
+        pendingSeek = time
         cancel()
         tearDownPlayer()
         mediaURL = url
@@ -239,6 +248,10 @@ final class AppModel: ObservableObject {
     private func setUpPlayer(_ player: AVPlayer) {
         self.player = player
         let interval = CMTime(seconds: 0.05, preferredTimescale: 600)
+        if let pendingSeek {
+            player.seek(to: CMTime(seconds: pendingSeek, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+            self.pendingSeek = nil
+        }
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             MainActor.assumeIsolated { self?.updateActive(time.seconds) }
         }

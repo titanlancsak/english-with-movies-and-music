@@ -5,6 +5,7 @@ Aplicativo de macOS para aprender inglês com filmes e músicas.
 - **Arraste um filme ou uma música** para a janela. O app transcreve todas as falas no seu Mac, sem internet e sem custo.
 - **A legenda aparece abaixo do vídeo**: a fala atual fica em **negrito** e a palavra que está sendo dita é destacada em tempo real.
 - **Clique em qualquer palavra** para ver o significado no dicionário, a pronúncia e até **3 exemplos de frases**. Quando o dicionário tem menos de 3 exemplos, o app completa com falas do próprio filme ou da própria música.
+- **Salve palavras** (🔖 no popup) para revisar depois. A lista guarda o significado, a frase em que a palavra apareceu e o filme. Ela também volta direto para o trecho e exporta **CSV** para o Anki (⇧⌘S abre a lista).
 - Clique no horário de uma fala para pular até ela.
 - **Baixe vídeos do YouTube** colando o link. Eles são salvos em `~/Movies/English with Movies`.
 - Já tem a legenda? Importe um `.srt` e a transcrição é pulada.
@@ -70,6 +71,7 @@ Sources/
     WhisperJSONParser.swift  lê a saída do whisper.cpp
     SRTParser.swift          importa legendas .srt
     Dictionary.swift         dicionário, normalização de palavras
+    SavedWords.swift         lista de palavras salvas e exportação CSV
   EnglishWithMovies/   app macOS (SwiftUI)
   LinguaCoreChecks/    verificações automáticas
 scripts/build-app.sh   empacota o .app
@@ -80,4 +82,3 @@ scripts/build-app.sh   empacota o .app
 - **iPhone/iPad**: o `LinguaCore` já compila para iOS. Basta criar as telas e trocar o whisper-cli pelo [WhisperKit](https://github.com/argmaxinc/WhisperKit).
 - **Windows/Android**: SwiftUI não roda nessas plataformas. A interface precisaria ser refeita (por exemplo, em Flutter), reaproveitando a mesma arquitetura e o formato dos dados.
 - Separar a voz da música com o [Demucs](https://github.com/facebookresearch/demucs) para melhorar a transcrição de músicas.
-- Lista de palavras salvas para revisão.

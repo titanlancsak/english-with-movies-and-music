@@ -6,7 +6,10 @@ import SwiftUI
 /// Definition card shown when a word is clicked.
 struct WordPopover: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var savedWords: SavedWordsStore
     let word: String
+    /// The subtitle line where the word was clicked (saved as context).
+    let line: TranscriptLine
 
     @ViewState private var entry: DictionaryEntry?
     @ViewState private var isLoading = true
@@ -45,7 +48,33 @@ struct WordPopover: View {
             }
             .buttonStyle(.borderless)
             .help("Ouvir a pronúncia")
+
+            let isSaved = savedWords.contains(word)
+            Button(action: toggleSaved) {
+                Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(isSaved ? Color.orange : Color.primary)
+            .disabled(isLoading)
+            .help(isSaved ? "Remover das palavras salvas" : "Salvar palavra")
         }
+    }
+
+    private func toggleSaved() {
+        if savedWords.contains(word) {
+            savedWords.remove(word)
+            return
+        }
+        let sense = entry?.senses.first
+        savedWords.add(SavedWord(
+            word: entry?.word ?? WordNormalizer.lookupKey(word),
+            phonetic: entry?.phonetic,
+            partOfSpeech: sense?.partOfSpeech,
+            definition: sense?.definition,
+            context: line.text,
+            sourcePath: model.mediaURL?.path,
+            sourceTime: line.start
+        ))
     }
 
     private func senses(_ entry: DictionaryEntry) -> some View {

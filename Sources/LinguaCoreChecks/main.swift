@@ -104,5 +104,21 @@ check(unnamed?.examples == ["A storm hit the coast", "A storm of protest"], "sys
 check(unnamed?.senses.count == 2, "system dictionary: splits capitalized numbered senses")
 check(SystemDictionaryParser.parse("nonsense without structure") == nil, "system dictionary: rejects unknown format")
 
+// MARK: Saved words
+
+var list = WordList()
+list.add(SavedWord(word: "Harbor", definition: "a place for ships", context: "We need to leave the harbor."))
+list.add(SavedWord(word: "storm", definition: "strong wind, \"rain\", and thunder"))
+list.add(SavedWord(word: "harbor!", definition: "updated"))
+check(list.words.map(\.key) == ["harbor", "storm"], "saved words: newest first, no duplicates")
+check(list.words.first?.definition == "updated", "saved words: saving again replaces the entry")
+check(list.contains("STORM.") && !list.contains("rain"), "saved words: contains ignores case and punctuation")
+check(list.filtered(by: "thunder").map(\.key) == ["storm"], "saved words: search in definitions")
+list.remove("Storm")
+check(list.words.count == 1, "saved words: remove")
+check(SavedWord(word: "x", sourcePath: "/Movies/Tears of Steel.mp4").sourceName == "Tears of Steel", "saved words: source name")
+let csv = WordList(words: [SavedWord(word: "storm", definition: "wind, \"rain\"")]).csv()
+check(csv == "word,phonetic,part of speech,definition,sentence,source\nstorm,,,\"wind, \"\"rain\"\"\",,\n", "saved words: CSV quoting")
+
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
 exit(failures == 0 ? 0 : 1)

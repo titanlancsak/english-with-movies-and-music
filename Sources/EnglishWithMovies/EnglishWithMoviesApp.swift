@@ -5,11 +5,13 @@ import SwiftUI
 struct EnglishWithMoviesApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @StateObject private var model = AppModel()
+    @StateObject private var savedWords = SavedWordsStore()
 
     var body: some Scene {
         WindowGroup("English with Movies & Music") {
             ContentView()
                 .environmentObject(model)
+                .environmentObject(savedWords)
                 .frame(minWidth: 820, minHeight: 620)
                 .onAppear { delegate.model = model }
         }
@@ -24,7 +26,17 @@ struct EnglishWithMoviesApp: App {
                 Button("Play / Pause") { model.togglePlay() }
                     .keyboardShortcut("p")
             }
+            CommandGroup(after: .windowArrangement) {
+                OpenSavedWordsButton()
+            }
         }
+
+        Window("Palavras salvas", id: "saved-words") {
+            SavedWordsView()
+                .environmentObject(model)
+                .environmentObject(savedWords)
+        }
+        .defaultSize(width: 560, height: 640)
     }
 }
 
@@ -66,6 +78,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+/// Menu item (⇧⌘S) that opens the saved words window.
+private struct OpenSavedWordsButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Palavras salvas") { openWindow(id: "saved-words") }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+    }
 }
 
 enum FilePicker {

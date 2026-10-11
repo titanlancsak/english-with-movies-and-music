@@ -77,6 +77,7 @@ private struct LineRow: View {
                 ForEach(Array(line.words.enumerated()), id: \.offset) { index, word in
                     WordButton(
                         word: word,
+                        line: line,
                         isLineActive: isActive,
                         isSpoken: isActive && (activeWord.map { index <= $0 } ?? false),
                         isCurrent: isActive && activeWord == index
@@ -102,14 +103,17 @@ private struct LineRow: View {
 
 private struct WordButton: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var savedWords: SavedWordsStore
     @ViewState private var showDefinition = false
     let word: TimedWord
+    let line: TranscriptLine
     let isLineActive: Bool
     let isSpoken: Bool
     let isCurrent: Bool
 
     var body: some View {
         Text(word.text)
+            .underline(savedWords.contains(word.text), color: .orange)
             .font(.system(size: isLineActive ? 20 : 16, weight: isLineActive ? .bold : .regular))
             .foregroundStyle(color)
             .padding(.horizontal, 2)
@@ -127,8 +131,9 @@ private struct WordButton: View {
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
             .popover(isPresented: $showDefinition, arrowEdge: .top) {
-                WordPopover(word: word.text)
+                WordPopover(word: word.text, line: line)
                     .environmentObject(model)
+                    .environmentObject(savedWords)
             }
     }
 

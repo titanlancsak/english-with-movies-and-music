@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var savedWords: SavedWordsStore
+    @Environment(\.openWindow) private var openWindow
     @ViewState private var isDropTargeted = false
     @ViewState private var showLinkSheet = false
     @ViewState private var cleanupSize: Int64?
@@ -45,6 +47,10 @@ struct ContentView: View {
                     .help("Baixar um vídeo a partir de um link do YouTube")
                 Button("Importar legenda", systemImage: "captions.bubble") { FilePicker.openSubtitles(model) }
                 Button("Abrir", systemImage: "folder") { FilePicker.openMedia(model) }
+                Button("Palavras salvas (\(savedWords.list.words.count))", systemImage: "bookmark") {
+                    openWindow(id: "saved-words")
+                }
+                .help("Palavras salvas (⇧⌘S)")
                 Button("Limpar cópias", systemImage: "trash") { cleanupSize = model.convertedCopiesSize() }
                     .help("Apagar as cópias convertidas para liberar espaço")
                     .disabled(model.isBusy)
