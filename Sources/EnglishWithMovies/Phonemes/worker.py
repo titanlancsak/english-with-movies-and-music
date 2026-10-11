@@ -5,6 +5,7 @@ Reads one WAV path per line on stdin (16 kHz mono, 16-bit) and writes one JSON l
 Kept running by the app so the model is loaded only once.
 
 Usage: python worker.py <folder with model.onnx and vocab.json>
+On Windows it ships as a standalone program built with PyInstaller (see .github/workflows/windows.yml).
 """
 import json
 import os
@@ -27,6 +28,9 @@ def load_wav(path: str) -> np.ndarray:
 
 
 def main(folder: str) -> None:
+    # Windows pipes default to the ANSI code page; the protocol is UTF-8 (IPA symbols, accented paths).
+    sys.stdin.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")
     options = ort.SessionOptions()
     options.log_severity_level = 3
     session = ort.InferenceSession(os.path.join(folder, "model.onnx"), options, providers=["CPUExecutionProvider"])

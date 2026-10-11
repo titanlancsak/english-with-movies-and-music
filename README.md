@@ -48,7 +48,7 @@ Tudo é gratuito: o app e todas as ferramentas que ele usa são de código abert
 | 🃏 **Revisão com cartões** e repetição espaçada (como o Anki), 3 modos | ✅ | ✅ |
 | 🎤 **Treino de pronúncia**: repita a fala do personagem e receba uma **nota de 0 a 100** | ✅ | ✅ |
 | 📊 **Histórico de notas** por fala, com a evolução | ✅ | ✅ |
-| 👄 **Análise som a som** (fonemas): mostra qual som saiu errado, como o "th" | ✅ (opcional) | — |
+| 👄 **Análise som a som** (fonemas): mostra qual som saiu errado, como o "th" | ✅ (opcional) | ✅ (opcional) |
 
 ### Como é a nota de pronúncia
 
@@ -58,7 +58,7 @@ Você ouve o personagem, grava a mesma frase e o app compara palavra por palavra
 - **Fluência (25%)**: sua velocidade comparada à do personagem e pausas longas;
 - **Completude (15%)**: se você falou a frase inteira.
 
-Cada palavra aparece em verde (correta), amarelo (pouco clara), vermelho (errada) ou cinza (faltou), com dicas em português. No Mac, a **análise som a som** opcional mostra também o fonema errado, por exemplo: *“think”: você disse /t/ no lugar de /θ/. Ponha a ponta da língua entre os dentes…*
+Cada palavra aparece em verde (correta), amarelo (pouco clara), vermelho (errada) ou cinza (faltou), com dicas em português. A **análise som a som** opcional mostra também o fonema errado, por exemplo: *“think”: você disse /t/ no lugar de /θ/. Ponha a ponta da língua entre os dentes…*
 
 ### Como funciona a revisão
 
@@ -94,6 +94,7 @@ Requisitos: Windows 10 ou 11 (64 bits). Não precisa instalar mais nada: as ferr
 
 - Arraste um filme ou música para a janela, clique em **Escolher arquivo…** ou em **Baixar do YouTube…**.
 - No Mac, a primeira transcrição baixa o modelo de reconhecimento de voz (**148 MB**, uma vez só); no Windows ele já vem no pacote. Modelos maiores, mais precisos, podem ser escolhidos no topo da janela.
+- Para ativar a **análise som a som**, abra a prática de qualquer fala e clique em **Ativar análise por som**. No Windows isso baixa o modelo de sons (**320 MB**, uma vez só); no Mac ele é instalado e convertido na hora (requer `espeak-ng` e `uv`, veja acima).
 - Um filme de 2 horas leva de 10 a 30 minutos para ser transcrito (depende do computador); você pode assistir enquanto isso. Cada arquivo é transcrito uma vez só.
 
 ### Atalhos (Mac)
@@ -124,7 +125,7 @@ Requisitos: Windows 10 ou 11 (64 bits). Não precisa instalar mais nada: as ferr
 | Tradução | [Translation](https://developer.apple.com/documentation/translation) da Apple (offline) | [MyMemory](https://mymemory.translated.net) (online, ~5.000 caracteres/dia grátis) |
 | Pronúncia (voz) | AVSpeechSynthesizer | flutter_tts (vozes do Windows) |
 | Microfone | AVAudioRecorder | [record](https://pub.dev/packages/record) |
-| Análise som a som | [wav2vec2 de fonemas da Meta](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) em ONNX + [espeak-ng](https://github.com/espeak-ng/espeak-ng) | — |
+| Análise som a som | [wav2vec2 de fonemas da Meta](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) em ONNX (Python) + [espeak-ng](https://github.com/espeak-ng/espeak-ng) | o mesmo modelo e o mesmo analisador, empacotado com PyInstaller; espeak-ng incluído no app |
 | Repetição espaçada | SM-2 (implementação própria) | SM-2 (implementação própria) |
 | Build do Windows | — | GitHub Actions (compila, empacota e testa num Windows real) |
 
@@ -147,7 +148,7 @@ interface: player em cima, legenda interativa embaixo
 
 ### Privacidade
 
-O áudio dos seus filmes e a sua voz **nunca saem do seu computador**: a transcrição e a avaliação de pronúncia rodam localmente. A internet é usada só para baixar o modelo na primeira vez, para baixar vídeos que você pedir, para o dicionário e (no Windows) para a tradução.
+O áudio dos seus filmes e a sua voz **nunca saem do seu computador**: a transcrição e a avaliação de pronúncia rodam localmente. A internet é usada só para baixar os modelos na primeira vez, para baixar vídeos que você pedir, para o dicionário e (no Windows) para a tradução.
 
 ---
 
@@ -173,7 +174,7 @@ dart test test/core_test.dart           # testes da lógica
 flutter build windows --release
 ```
 
-O executável fica em `app-windows/build/windows/x64/runner/Release`. Para funcionar, coloque `ffmpeg.exe`, `ffprobe.exe` (e DLLs), `yt-dlp.exe` e a pasta do whisper.cpp em `Release/tools/` — o workflow [`.github/workflows/windows.yml`](.github/workflows/windows.yml) faz isso automaticamente e publica o `.zip` a cada versão.
+O executável fica em `app-windows/build/windows/x64/runner/Release`. Para funcionar, coloque `ffmpeg.exe`, `ffprobe.exe` (e DLLs), `yt-dlp.exe` a pasta do whisper.cpp e, para a análise som a som, `espeak-ng/` e o analisador `phonemes/` em `Release/tools/` — o workflow [`.github/workflows/windows.yml`](.github/workflows/windows.yml) faz isso automaticamente e publica o `.zip` a cada versão.
 
 ## Estrutura do projeto
 
@@ -182,7 +183,7 @@ Package.swift                Mac: pacote Swift
 Sources/
   LinguaCore/                Mac: lógica (transcrição, dicionário, revisão, pronúncia…)
   EnglishWithMovies/         Mac: app SwiftUI
-    Phonemes/                Mac: instalação e execução do modelo de fonemas (Python/ONNX)
+    Phonemes/                modelo de fonemas (Python/ONNX): instalação no Mac, analisador do Mac e do Windows
   LinguaCoreChecks/          Mac: verificações automáticas
 scripts/                     Mac: gerar o .app, o .zip e o ícone
 Resources/                   ícone do app

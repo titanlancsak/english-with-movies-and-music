@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path/path.dart' as p;
 
+import '../core/phonemes.dart';
 import '../core/pronunciation.dart';
 import '../core/transcript.dart';
 import '../services/app_controller.dart';
@@ -114,6 +115,7 @@ class _PracticeDialogState extends State<PracticeDialog> {
           _controls(),
           const SizedBox(height: 14),
           _content(),
+          const _SoundsSetupCard(),
           _history(),
           Align(
             alignment: Alignment.centerRight,
@@ -207,6 +209,7 @@ class _PracticeDialogState extends State<PracticeDialog> {
           metric('Precisão', result.accuracy),
           metric('Fluência', result.fluency),
           metric('Completude', result.completeness),
+          if (result.sounds != null) metric('Sons', result.sounds!.score),
         ]),
       ]),
       const SizedBox(height: 14),
@@ -249,6 +252,7 @@ class _PracticeDialogState extends State<PracticeDialog> {
             Expanded(child: Text(tip)),
           ]),
         ),
+      if (result.sounds != null) _SoundsSection(sounds: result.sounds!),
     ]);
   }
 
@@ -278,6 +282,151 @@ class _PracticeDialogState extends State<PracticeDialog> {
               ),
           ]),
         ]);
+      },
+    );
+  }
+}
+
+/// Sound-by-sound feedback: each word's expected sounds, colored by how they came out.
+class _SoundsSection extends StatelessWidget {
+  const _SoundsSection({required this.sounds});
+  final SoundAnalysis sounds;
+
+  @override
+  Widget build(BuildContext context) {
+    final problems = sounds.words.where((w) => w.extra.isNotEmpty || w.sounds.any((s) => s.status != SoundStatus.correct));
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Sons', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        if (problems.isEmpty)
+          const Row(children: [
+            Icon(Icons.verified, color: Colors.green, size: 18),
+            SizedBox(width: 6),
+            Text('Todos os sons saíram corretos!', style: TextStyle(color: Colors.green)),
+          ])
+        else
+          for (final word in problems)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(width: 90, child: Text(word.text, style: const TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(
+                  child: Wrap(spacing: 4, runSpacing: 4, children: [
+                    for (final sound in word.sounds) _SoundChip(sound: sound),
+                    for (final extra in word.extra)
+                      Tooltip(
+                        message: 'Som a mais: /$extra/',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(color: Colors.purple.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(5)),
+                          child: Text('+$extra', style: const TextStyle(fontFamily: 'Consolas', color: Colors.purpleAccent)),
+                        ),
+                      ),
+                  ]),
+                ),
+              ]),
+            ),
+        for (final tip in sounds.tips)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.record_voice_over_outlined, size: 18, color: accentOrange),
+              const SizedBox(width: 6),
+              Expanded(child: Text(tip)),
+            ]),
+          ),
+      ]),
+    );
+  }
+}
+
+class _SoundChip extends StatelessWidget {
+  const _SoundChip({required this.sound});
+  final Sound sound;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (sound.status) {
+      SoundStatus.correct => Colors.green,
+      SoundStatus.close => Colors.yellow,
+      SoundStatus.wrong => Colors.red,
+      SoundStatus.missing => Colors.grey,
+    };
+    final name = PhonemeTips.name(sound.expected);
+    final title = '/${sound.expected}/${name == null ? '' : ' — $name'}';
+    return Tooltip(
+      message: switch (sound.status) {
+        SoundStatus.correct => '$title: correto',
+        SoundStatus.close => '$title: saiu parecido com /${sound.heard ?? '?'}/',
+        SoundStatus.wrong => '$title: você disse /${sound.heard ?? '?'}/',
+        SoundStatus.missing => '$title: não foi pronunciado',
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(5)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(sound.expected,
+              style: TextStyle(
+                fontFamily: 'Consolas',
+                color: color,
+                decoration: sound.status == SoundStatus.missing ? TextDecoration.lineThrough : null,
+              )),
+          if (sound.heard != null) Text(sound.heard!, style: const TextStyle(fontFamily: 'Consolas', fontSize: 10, color: Colors.white54)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Offers the one-time download of the sound analysis.
+class _SoundsSetupCard extends StatelessWidget {
+  const _SoundsSetupCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: app.soundSetup,
+      builder: (context, _) {
+        final setup = app.soundSetup;
+        if (setup.isReady) return const SizedBox.shrink();
+        final progress = setup.progress;
+        return Container(
+          margin: const EdgeInsets.only(top: 14),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Row(children: [
+              Icon(Icons.record_voice_over_outlined, size: 20),
+              SizedBox(width: 8),
+              Text('Análise por som', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ]),
+            const SizedBox(height: 8),
+            if (setup.problem != null)
+              Text(setup.problem!, style: const TextStyle(color: Colors.orange))
+            else if (progress != null) ...[
+              LinearProgressIndicator(value: progress),
+              const SizedBox(height: 6),
+              Text('Baixando o modelo de sons… ${(progress * 100).round()}%'),
+              const Text('Pode continuar praticando enquanto isso.', style: TextStyle(fontSize: 12, color: Colors.white54)),
+            ] else ...[
+              const Text(
+                  'Descubra exatamente qual som saiu errado (o “th”, o R americano, “ship” × “sheep”…). '
+                  'Instalação única: baixa cerca de 320 MB.',
+                  style: TextStyle(color: Colors.white60)),
+              if (setup.error != null) ...[
+                const SizedBox(height: 6),
+                Text(setup.error!, style: const TextStyle(color: Colors.orange)),
+              ],
+              const SizedBox(height: 8),
+              FilledButton.tonal(
+                onPressed: setup.install,
+                child: Text(setup.error == null ? 'Ativar análise por som' : 'Tentar de novo'),
+              ),
+            ],
+          ]),
+        );
       },
     );
   }

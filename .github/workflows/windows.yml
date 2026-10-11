@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-    paths: ['app-windows/**', '.github/workflows/windows.yml']
+    paths: ['app-windows/**', 'Sources/EnglishWithMovies/Phonemes/worker.py', '.github/workflows/windows.yml']
   workflow_dispatch:
 
 permissions:
@@ -17,6 +17,7 @@ env:
   FLUTTER_VERSION: '3.38.4'
   # whisper.cpp builds with Windows binaries (the vX.Y.Z tags have none).
   WHISPER_RELEASE: 'b5454'
+  ESPEAK_RELEASE: '1.52.0'
 
 jobs:
   build:
@@ -74,6 +75,35 @@ jobs:
           & "$tools/ffmpeg.exe" -version | Select-Object -First 1
           & "$tools/whisper/whisper-cli.exe" --help 2>&1 | Select-Object -First 3
           & "$tools/yt-dlp.exe" --version
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Bundle the sound analysis (espeak-ng and the phoneme worker)
+        run: |
+          $tools = "build/windows/x64/runner/Release/tools"
+
+          # espeak-ng: the MSI is unpacked (administrative install), nothing is installed on the machine.
+          Invoke-WebRequest "https://github.com/espeak-ng/espeak-ng/releases/download/$env:ESPEAK_RELEASE/espeak-ng.msi" -OutFile downloads/espeak-ng.msi
+          $unpacked = "$env:RUNNER_TEMP/espeak-ng"
+          Start-Process msiexec -ArgumentList "/a `"$((Resolve-Path downloads/espeak-ng.msi).Path)`" /qn TARGETDIR=`"$unpacked`"" -Wait
+          $espeak = Get-ChildItem $unpacked -Recurse -Filter espeak-ng.exe | Select-Object -First 1
+          New-Item -ItemType Directory -Force "$tools/espeak-ng" | Out-Null
+          Copy-Item "$($espeak.DirectoryName)/*" "$tools/espeak-ng" -Recurse
+          & "$tools/espeak-ng/espeak-ng.exe" "--path=$tools/espeak-ng" -q -v en-us --ipa --sep=_ "think big"
+
+          # The phoneme worker (the Mac app's worker.py) as a standalone program: no Python needed on the user's PC.
+          python -m pip install --quiet pyinstaller "onnxruntime>=1.20" "numpy>=1.26"
+          python -m PyInstaller --noconfirm --onedir --name phonemes --distpath downloads/pyinstaller --workpath "$env:RUNNER_TEMP/pyinstaller" ../Sources/EnglishWithMovies/Phonemes/worker.py
+          Copy-Item downloads/pyinstaller/phonemes $tools -Recurse
+          Get-ChildItem "$tools/phonemes" | Select-Object -First 5
+
+      - name: Sound analysis test (speech -> worker + espeak-ng, model downloaded from the release)
+        run: |
+          $env:TOOLS_DIR = (Resolve-Path "build/windows/x64/runner/Release/tools").Path
+          $env:PHONEME_DOWNLOAD = '1'
+          dart test test/phonemes_test.dart -r expanded
 
       - name: End-to-end test (speech -> app -> live subtitles screenshot)
         continue-on-error: true

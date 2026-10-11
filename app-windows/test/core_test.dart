@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:english_with_movies/core/dictionary.dart';
 import 'package:english_with_movies/core/parsers.dart';
+import 'package:english_with_movies/core/phonemes.dart';
 import 'package:english_with_movies/core/pronunciation.dart';
 import 'package:english_with_movies/core/review.dart';
 import 'package:english_with_movies/core/saved_words.dart';
@@ -191,6 +192,40 @@ void main() {
       expect(history.averageScore, 65);
       final restored = PracticeHistory.fromJson(jsonDecode(jsonEncode(history.toJson())) as Map<String, dynamic>);
       expect(restored.record('A', 'Film')?.attempts.length, 2);
+    });
+  });
+
+  group('sounds (phonemes)', () {
+    test('splits espeak output', () {
+      expect(PhonemeAnalyzer.phonemesFromEspeak('θ_ˈɪ_ŋ_k ð_ə\r\n'), ['θ', 'ɪ', 'ŋ', 'k', 'ð', 'ə']);
+      expect(PhonemeAnalyzer.phonemesFromEspeak('ɑːɹx', vocabulary: {'ɑːɹ', 'x'}), ['ɑːɹ', 'x']);
+    });
+
+    test('finds wrong, missing and extra sounds', () {
+      final think = PhonemeAnalyzer.analyze(
+          words: ['think', 'big'], expected: [['θ', 'ɪ', 'ŋ', 'k'], ['b', 'ɪ', 'ɡ']], heard: ['t', 'ɪ', 'ŋ', 'k', 'b', 'ɪ', 'ɡ', 'i']);
+      expect(think.words[0].sounds.first.status, SoundStatus.wrong);
+      expect(think.words[0].sounds.first.heard, 't');
+      expect(think.words[1].extra, ['i']);
+      expect(think.tips.any((t) => t.contains('think') && t.contains('língua entre os dentes')), isTrue);
+      expect(think.tips.any((t) => t.contains('big') && t.contains('“i”')), isTrue);
+      expect(think.score, inExclusiveRange(0.5, 0.9));
+
+      final sheep = PhonemeAnalyzer.analyze(words: ['sheep'], expected: [['ʃ', 'iː', 'p']], heard: ['ʃ', 'i', 'p']);
+      expect(sheep.score, 1);
+      expect(sheep.tips, isEmpty);
+      final ship = PhonemeAnalyzer.analyze(words: ['sheep'], expected: [['ʃ', 'iː', 'p']], heard: ['ʃ', 'ɪ', 'p']);
+      expect(ship.words[0].sounds[1].status, SoundStatus.close);
+      final dropped = PhonemeAnalyzer.analyze(words: ['want'], expected: [['w', 'ɑː', 'n', 't']], heard: ['w', 'ɑː', 'n']);
+      expect(dropped.words[0].sounds.last.status, SoundStatus.missing);
+      final vowel = PhonemeAnalyzer.analyze(words: ['weather'], expected: [['w', 'ɛ', 'ð', 'ɚ']], heard: ['w', 'iː', 'ð', 'ɚ']);
+      expect(vowel.tips.first, allOf(contains('i longo (sheep)'), contains('é (bed)')));
+
+      final line = TranscriptLine(0, 10, 12.8, words('We need to leave the harbor before sunset.', start: 10, step: 0.35));
+      final perfect = scorePronunciation(line, words('We need to leave the harbor before sunset.'));
+      final withSounds = scorePronunciation(line, words('We need to leave the harbor before sunset.'), sounds: think);
+      expect(withSounds.score, lessThan(perfect.score));
+      expect(withSounds.sounds, isNotNull);
     });
   });
 }

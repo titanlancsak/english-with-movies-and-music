@@ -18,10 +18,12 @@ PRIMEIRO USO
   "Rápido" já vem junto. Os modelos maiores (mais precisos) são baixados
   quando você escolhe um deles no topo da janela.
 - O dicionário e a tradução para o português usam a internet.
+- Análise som a som da pronúncia: na tela de prática, clique em
+  "Ativar análise por som". O app baixa o modelo de sons (320 MB, uma vez só).
 - Os vídeos baixados do YouTube ficam em Vídeos\English with Movies.
 
-A pasta "tools" contém programas gratuitos que o app usa (ffmpeg, whisper.cpp
-e yt-dlp). Não apague essa pasta.
+A pasta "tools" contém programas gratuitos que o app usa (ffmpeg, whisper.cpp,
+yt-dlp, espeak-ng e o analisador de sons). Não apague essa pasta.
 
 Código-fonte e versão para Mac:
 https://github.com/titanlancsak/english-with-movies-and-music

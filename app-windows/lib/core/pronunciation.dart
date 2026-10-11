@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'phonemes.dart';
 import 'transcript.dart';
 
 enum WordStatus { correct, unsure, wrong, missing }
@@ -25,6 +26,7 @@ class PronunciationResult {
     required this.score,
     this.speedRatio,
     this.longPauses = 0,
+    this.sounds,
   });
 
   final List<WordResult> words;
@@ -38,6 +40,9 @@ class PronunciationResult {
   /// The user's duration divided by the character's (1 = same speed).
   final double? speedRatio;
   final int longPauses;
+
+  /// Sound-by-sound analysis, when the phoneme recognizer is installed.
+  final SoundAnalysis? sounds;
 
   /// Short advice in Portuguese.
   List<String> get tips {
@@ -67,15 +72,16 @@ class PronunciationResult {
 }
 
 /// Scores a spoken attempt against a subtitle line, word by word.
-/// Accuracy 60% (with recognizer confidence), fluency 25% (speed and pauses), completeness 15%.
-PronunciationResult scorePronunciation(TranscriptLine target, List<TimedWord> spoken) {
+/// Accuracy 60% (with recognizer confidence; with a sound analysis, half of it comes from the sounds),
+/// fluency 25% (speed and pauses), completeness 15%.
+PronunciationResult scorePronunciation(TranscriptLine target, List<TimedWord> spoken, {SoundAnalysis? sounds}) {
   final expected = target.words.where((w) => comparable(w.text).isNotEmpty).toList();
   final heard = spoken.where((w) => comparable(w.text).isNotEmpty).toList();
   final recognizedText = spoken.map((w) => w.text).join(' ');
   if (expected.isEmpty) {
     return PronunciationResult(
         words: const [], extraWords: const [], recognizedText: recognizedText,
-        accuracy: 0, fluency: 0, completeness: 0, score: 0);
+        accuracy: 0, fluency: 0, completeness: 0, score: 0, sounds: sounds);
   }
 
   final results = <WordResult>[];
@@ -102,7 +108,9 @@ PronunciationResult scorePronunciation(TranscriptLine target, List<TimedWord> sp
   }
 
   final count = expected.length.toDouble();
-  final accuracy = max(0.0, credit / count - 0.05 * extras.length);
+  final wordAccuracy = max(0.0, credit / count - 0.05 * extras.length);
+  // Nothing recognized means nothing to credit, whatever the sounds say.
+  final accuracy = sounds == null ? wordAccuracy : (heard.isEmpty ? 0.0 : 0.5 * wordAccuracy + 0.5 * sounds.score);
   final missing = results.where((r) => r.status == WordStatus.missing).length;
   final completeness = 1 - missing / count;
 
@@ -131,7 +139,7 @@ PronunciationResult scorePronunciation(TranscriptLine target, List<TimedWord> sp
   return PronunciationResult(
     words: results, extraWords: extras, recognizedText: recognizedText,
     accuracy: accuracy, fluency: fluency, completeness: completeness,
-    score: score, speedRatio: speedRatio, longPauses: longPauses,
+    score: score, speedRatio: speedRatio, longPauses: longPauses, sounds: sounds,
   );
 }
 

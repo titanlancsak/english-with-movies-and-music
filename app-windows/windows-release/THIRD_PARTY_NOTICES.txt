@@ -18,6 +18,19 @@ yt-dlp (tools\yt-dlp.exe)
   License: The Unlicense (public domain)
   Source:  https://github.com/yt-dlp/yt-dlp
 
+eSpeak NG (tools\espeak-ng\)
+  License: GNU General Public License v3
+  Source:  https://github.com/espeak-ng/espeak-ng
+
+Phoneme recognizer (tools\phonemes\), built with PyInstaller from
+Sources/EnglishWithMovies/Phonemes/worker.py. It contains:
+  Python (PSF License) — https://www.python.org
+  ONNX Runtime (MIT) — https://github.com/microsoft/onnxruntime
+  NumPy (BSD 3-Clause) — https://numpy.org
+  Its model is downloaded when the user turns on the sound analysis:
+  facebook/wav2vec2-lv-60-espeak-cv-ft (Apache 2.0), converted to int8 ONNX —
+  https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft
+
 Whisper speech recognition models (ggml format; tools\models\ggml-base.en.bin
 is included, larger models are downloaded by the app when chosen)
   License: MIT (OpenAI Whisper)

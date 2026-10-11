@@ -31,6 +31,7 @@ class MediaTools {
     final candidates = [
       p.join(AppPaths.tools.path, exe),
       p.join(AppPaths.tools.path, 'whisper', exe),
+      p.join(AppPaths.tools.path, name, exe), // e.g. tools\espeak-ng\espeak-ng.exe
       if (!Platform.isWindows) ...['/opt/homebrew/bin/$exe', '/usr/local/bin/$exe'],
       ...(Platform.environment['PATH'] ?? '').split(Platform.isWindows ? ';' : ':').map((dir) => p.join(dir, exe)),
     ];

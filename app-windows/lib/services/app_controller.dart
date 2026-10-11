@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path/path.dart' as p;
 
 import '../core/parsers.dart';
+import '../core/phonemes.dart';
 import '../core/pronunciation.dart';
 import '../core/saved_words.dart';
 import '../core/transcript.dart';
@@ -15,6 +16,8 @@ import 'language.dart';
 import 'log.dart';
 import 'media_tools.dart';
 import 'paths.dart';
+import 'phonemes.dart';
+import 'sound_setup.dart';
 import 'stores.dart';
 
 /// The single app state, created in main().
@@ -36,6 +39,7 @@ class AppController extends ChangeNotifier {
   final dictionary = DictionaryService();
   final translator = Translator();
   final speaker = Speaker();
+  final soundSetup = SoundSetup();
 
   final player = Player();
   late final video = VideoController(player);
@@ -301,7 +305,21 @@ class AppController extends ChangeNotifier {
       await WhisperModel.base.download((_) {});
       modelFile = WhisperModel.base.file;
     }
-    final heard = await MediaTools().transcribe(recording, modelFile.path);
-    return scorePronunciation(line, heard.lines.expand((l) => l.words).toList());
+    // Whatever the microphone recorded, both recognizers get 16 kHz mono 16-bit audio.
+    final wav = p.join(AppPaths.work.path, '${p.basenameWithoutExtension(recording)}-16k.wav');
+    await MediaTools().extractAudio(recording, wav);
+    try {
+      // The sound analysis is a bonus: if it fails, the word-level score still works.
+      final sounds = soundSetup.isReady
+          ? PhonemeRecognizer.analyze(wav, line).then<SoundAnalysis?>((analysis) => analysis, onError: (Object error) {
+              log('Análise de sons falhou: $error');
+              return null;
+            })
+          : Future<SoundAnalysis?>.value(null);
+      final heard = await MediaTools().transcribe(wav, modelFile.path);
+      return scorePronunciation(line, heard.lines.expand((l) => l.words).toList(), sounds: await sounds);
+    } finally {
+      File(wav).delete().ignore();
+    }
   }
 }
