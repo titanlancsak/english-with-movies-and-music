@@ -18,7 +18,9 @@ class PlayerScreen extends StatelessWidget {
   const PlayerScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: app, builder: (context, _) => _build());
+
+  Widget _build() {
     return Column(children: [
       Expanded(
         flex: 5,
@@ -75,8 +77,11 @@ class _TranscriptPanelState extends State<TranscriptPanel> {
     _scroll.scrollTo(index: line, alignment: 0.35, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
   }
 
+  /// Rebuilds when the transcript arrives (the list inside also follows the active line).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: app, builder: (context, _) => _build(context));
+
+  Widget _build(BuildContext context) {
     final transcript = app.transcript;
     if (transcript == null) {
       return const Center(

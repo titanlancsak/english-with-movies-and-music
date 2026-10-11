@@ -152,11 +152,15 @@ Future<void> showLinkDialog(BuildContext context) async {
   if (link != null && Uri.tryParse(link.trim())?.hasAuthority == true) app.download(link);
 }
 
+/// Progress or error of the current task. Listens to the app itself: as a const
+/// widget it would not be rebuilt when its parent rebuilds.
 class StatusBar extends StatelessWidget {
   const StatusBar({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: app, builder: (context, _) => _build(context));
+
+  Widget _build(BuildContext context) {
     switch (app.status) {
       case Status.working:
         return Container(

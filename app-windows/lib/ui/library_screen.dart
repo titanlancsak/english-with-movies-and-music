@@ -15,7 +15,10 @@ class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ListenableBuilder(listenable: Listenable.merge([app.library, app.savedWords]), builder: (context, _) => _build(context));
+
+  Widget _build(BuildContext context) {
     final library = app.library;
     final featured = library.featured;
     return ListView(
