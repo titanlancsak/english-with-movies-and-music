@@ -1,5 +1,5 @@
 /// The version of this app; must match pubspec.yaml (checked by test/core_test.dart).
-const appVersion = '1.2.0';
+const appVersion = '1.3.0';
 
 /// "v1.10.0" is newer than "1.9.2"; anything that is not a version is never newer.
 bool isNewerVersion(String candidate, String current) {
