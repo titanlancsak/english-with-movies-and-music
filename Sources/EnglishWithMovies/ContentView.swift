@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject private var savedWords: SavedWordsStore
     @EnvironmentObject private var translator: Translator
     @EnvironmentObject private var practice: PracticeStore
+    @EnvironmentObject private var phonemes: PhonemeEngine
     @Environment(\.openWindow) private var openWindow
     @ViewState private var isDropTargeted = false
     @ViewState private var showLinkSheet = false
@@ -39,6 +40,7 @@ struct ContentView: View {
             PracticeView(line: line)
                 .environmentObject(model)
                 .environmentObject(practice)
+                .environmentObject(phonemes)
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             guard let provider = providers.first else { return false }

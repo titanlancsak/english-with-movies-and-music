@@ -6,6 +6,7 @@ import SwiftUI
 struct PracticeView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var practice: PracticeStore
+    @EnvironmentObject private var phonemes: PhonemeEngine
     @Environment(\.dismiss) private var dismiss
     @StateObject private var recorder = VoiceRecorder()
     let line: TranscriptLine
@@ -45,6 +46,10 @@ struct PracticeView: View {
 
             controls
             content
+
+            if phonemes.state != .ready {
+                SoundsSetupCard()
+            }
 
             if let record = practice.record(for: line, source: model.sourceName) {
                 Divider()
@@ -141,7 +146,7 @@ struct PracticeView: View {
     private func analyze(_ url: URL) async {
         phase = .analyzing
         do {
-            let result = try await model.assess(recording: url, line: line)
+            let result = try await model.assess(recording: url, line: line, phonemes: phonemes)
             practice.add(result, for: line, source: model.sourceName)
             phase = .result(result)
         } catch {
@@ -183,6 +188,9 @@ private struct ResultView: View {
                     Metric(title: "Precisão", value: result.accuracy)
                     Metric(title: "Fluência", value: result.fluency)
                     Metric(title: "Completude", value: result.completeness)
+                    if let sounds = result.sounds {
+                        Metric(title: "Sons", value: sounds.score)
+                    }
                 }
             }
 
@@ -221,6 +229,10 @@ private struct ResultView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            if let sounds = result.sounds {
+                SoundsSection(sounds: sounds)
+            }
         }
     }
 
@@ -247,6 +259,120 @@ private struct ResultView: View {
         case .wrong: .red
         case .missing: .gray
         }
+    }
+}
+
+/// Sound-by-sound feedback: each word's expected sounds, colored by how they came out.
+private struct SoundsSection: View {
+    let sounds: SoundAnalysis
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Sons").font(.headline)
+            let problems = sounds.words.filter { word in
+                !word.extra.isEmpty || word.sounds.contains { $0.status != .correct }
+            }
+            if problems.isEmpty {
+                Label("Todos os sons saíram corretos!", systemImage: "checkmark.seal.fill")
+                    .foregroundStyle(.green)
+            } else {
+                ForEach(Array(problems.enumerated()), id: \.offset) { _, word in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text(word.text)
+                            .font(.callout.bold())
+                            .frame(width: 90, alignment: .leading)
+                        FlowLayout(spacing: 4, lineSpacing: 4) {
+                            ForEach(Array(word.sounds.enumerated()), id: \.offset) { _, sound in
+                                SoundChip(sound: sound)
+                            }
+                            ForEach(Array(word.extra.enumerated()), id: \.offset) { _, extra in
+                                Text("+\(extra)")
+                                    .font(.system(.callout, design: .monospaced))
+                                    .foregroundStyle(.purple)
+                                    .padding(.horizontal, 5)
+                                    .background(RoundedRectangle(cornerRadius: 5).fill(Color.purple.opacity(0.12)))
+                                    .help("Som a mais: /\(extra)/")
+                            }
+                        }
+                    }
+                }
+            }
+            ForEach(sounds.tips, id: \.self) { tip in
+                Label(tip, systemImage: "mouth")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+private struct SoundChip: View {
+    let sound: SoundAnalysis.Sound
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(sound.expected)
+                .font(.system(.callout, design: .monospaced))
+                .strikethrough(sound.status == .missing)
+            if let heard = sound.heard {
+                Text(heard)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1)
+        .background(RoundedRectangle(cornerRadius: 5).fill(color.opacity(0.13)))
+        .help(help)
+    }
+
+    private var color: Color {
+        switch sound.status {
+        case .correct: .green
+        case .close: .yellow
+        case .wrong: .red
+        case .missing: .gray
+        }
+    }
+
+    private var help: String {
+        let name = PhonemeTips.name(for: sound.expected).map { " — \($0)" } ?? ""
+        switch sound.status {
+        case .correct: return "/\(sound.expected)/\(name): correto"
+        case .close: return "/\(sound.expected)/\(name): saiu parecido com /\(sound.heard ?? "?")/"
+        case .wrong: return "/\(sound.expected)/\(name): você disse /\(sound.heard ?? "?")/"
+        case .missing: return "/\(sound.expected)/\(name): não foi pronunciado"
+        }
+    }
+}
+
+/// Offers the one-time install of the sound analysis.
+private struct SoundsSetupCard: View {
+    @EnvironmentObject private var phonemes: PhonemeEngine
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Análise por som", systemImage: "mouth").font(.headline)
+            switch phonemes.state {
+            case .notInstalled, .ready:
+                Text("Descubra exatamente qual som saiu errado (o “th”, o R americano, “ship” × “sheep”…). Instalação única: baixa cerca de 1,5 GB e ocupa uns 450 MB depois.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Ativar análise por som") { phonemes.install() }
+            case .installing(let progress, let message):
+                ProgressView(value: progress) { Text(message) }
+                Text("Pode continuar praticando enquanto isso.").font(.caption).foregroundStyle(.secondary)
+            case .failed(let message):
+                Text(message)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                Button("Tentar de novo") { phonemes.install() }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
     }
 }
 

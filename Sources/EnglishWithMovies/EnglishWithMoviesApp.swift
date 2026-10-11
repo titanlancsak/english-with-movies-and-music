@@ -8,6 +8,7 @@ struct EnglishWithMoviesApp: App {
     @StateObject private var savedWords = SavedWordsStore()
     @StateObject private var translator = Translator()
     @StateObject private var practice = PracticeStore()
+    @StateObject private var phonemes = PhonemeEngine()
 
     var body: some Scene {
         WindowGroup("English with Movies & Music") {
@@ -16,6 +17,7 @@ struct EnglishWithMoviesApp: App {
                 .environmentObject(savedWords)
                 .environmentObject(translator)
                 .environmentObject(practice)
+                .environmentObject(phonemes)
                 .modifier(TranslationHost(translator: translator))
                 .frame(minWidth: 820, minHeight: 620)
                 .onAppear { delegate.model = model }

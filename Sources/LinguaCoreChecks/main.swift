@@ -193,5 +193,31 @@ check(record?.attempts.count == 2 && record?.best == perfect.score, "history: at
 check(history.attemptCount == 3 && history.recent.first?.sentence == "Another line", "history: counts and most recent first")
 check(history.averageScore == (perfect.score + partial.score + 1) / 2 || history.averageScore == (perfect.score + partial.score) / 2, "history: average of latest scores")
 
+// MARK: Sounds (phonemes)
+
+check(PhonemeAnalyzer.phonemes(fromEspeak: "θ_ˈɪ_ŋ_k ð_ə") == ["θ", "ɪ", "ŋ", "k", "ð", "ə"], "sounds: espeak output split, stress removed")
+check(PhonemeAnalyzer.phonemes(fromEspeak: "ɑːɹx", vocabulary: ["ɑːɹ", "x"]) == ["ɑːɹ", "x"], "sounds: unknown symbols split into known ones")
+
+let think = PhonemeAnalyzer.analyze(words: ["think", "big"], expected: [["θ", "ɪ", "ŋ", "k"], ["b", "ɪ", "ɡ"]],
+                                    heard: ["t", "ɪ", "ŋ", "k", "b", "ɪ", "ɡ", "i"])
+check(think.words[0].sounds.first?.status == .wrong && think.words[0].sounds.first?.heard == "t", "sounds: th said as t")
+check(think.words[1].extra == ["i"], "sounds: extra vowel after final consonant")
+check(think.tips.contains { $0.contains("think") && $0.contains("língua entre os dentes") }, "sounds: th tip")
+check(think.tips.contains { $0.contains("big") && $0.contains("“i”") }, "sounds: extra vowel tip")
+check(think.score < 0.9 && think.score > 0.5, "sounds: score reflects errors (\(think.score))")
+
+let clean = PhonemeAnalyzer.analyze(words: ["sheep"], expected: [["ʃ", "iː", "p"]], heard: ["ʃ", "i", "p"])
+check(clean.score == 1 && clean.tips.isEmpty, "sounds: length marks do not count as errors")
+let ship = PhonemeAnalyzer.analyze(words: ["sheep"], expected: [["ʃ", "iː", "p"]], heard: ["ʃ", "ɪ", "p"])
+check(ship.words[0].sounds[1].status == .close, "sounds: ship vs sheep is close, not correct")
+let dropped = PhonemeAnalyzer.analyze(words: ["want"], expected: [["w", "ɑː", "n", "t"]], heard: ["w", "ɑː", "n"])
+check(dropped.words[0].sounds.last?.status == .missing, "sounds: dropped final consonant")
+
+let vowel = PhonemeAnalyzer.analyze(words: ["weather"], expected: [["w", "ɛ", "ð", "ɚ"]], heard: ["w", "iː", "ð", "ɚ"])
+check(vowel.tips.first?.contains("i longo (sheep)") == true && vowel.tips.first?.contains("é (bed)") == true, "sounds: generic tip uses friendly names")
+
+let withSounds = PronunciationScorer.score(target: line, spoken: spoken("We need to leave the harbor before sunset."), sounds: think)
+check(withSounds.score < perfect.score && withSounds.sounds != nil, "sounds: sound errors lower the score (\(withSounds.score))")
+
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
 exit(failures == 0 ? 0 : 1)

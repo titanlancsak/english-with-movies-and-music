@@ -35,6 +35,8 @@ public struct PronunciationResult: Codable, Hashable, Sendable {
     /// The user's duration divided by the character's (1 = same speed).
     public var speedRatio: Double?
     public var longPauses: Int
+    /// Sound-by-sound analysis, when the phoneme recognizer is installed.
+    public var sounds: SoundAnalysis?
 
     /// Short advice in Portuguese.
     public var tips: [String] {
@@ -80,18 +82,20 @@ public struct PronunciationResult: Codable, Hashable, Sendable {
 
 /// Scores a spoken attempt against a subtitle line, word by word.
 ///
-/// - Accuracy (60%): words recognized correctly, weighted by the recognizer's confidence.
+/// - Accuracy (60%): words recognized correctly, weighted by the recognizer's confidence;
+///   with a sound analysis, half of it comes from the sounds.
 /// - Fluency (25%): speed compared with the character, and long pauses, weighted by accuracy.
 /// - Completeness (15%): how much of the sentence was said.
 public enum PronunciationScorer {
-    public static func score(target: TranscriptLine, spoken: [TimedWord]) -> PronunciationResult {
+    public static func score(target: TranscriptLine, spoken: [TimedWord], sounds: SoundAnalysis? = nil) -> PronunciationResult {
         let expected = target.words.filter { !comparable($0.text).isEmpty }
         let heard = spoken.filter { !comparable($0.text).isEmpty }
         let recognizedText = spoken.map(\.text).joined(separator: " ")
 
         guard !expected.isEmpty else {
             return PronunciationResult(words: [], extraWords: [], recognizedText: recognizedText,
-                                       accuracy: 0, fluency: 0, completeness: 0, score: 0, speedRatio: nil, longPauses: 0)
+                                       accuracy: 0, fluency: 0, completeness: 0, score: 0, speedRatio: nil, longPauses: 0,
+                                       sounds: sounds)
         }
 
         var results: [PronunciationResult.WordResult] = []
@@ -121,7 +125,9 @@ public enum PronunciationScorer {
         }
 
         let count = Double(expected.count)
-        let accuracy = max(0, credit / count - 0.05 * Double(extras.count))
+        let wordAccuracy = max(0, credit / count - 0.05 * Double(extras.count))
+        // Nothing recognized means nothing to credit, whatever the sounds say.
+        let accuracy = sounds.map { heard.isEmpty ? 0 : 0.5 * wordAccuracy + 0.5 * $0.score } ?? wordAccuracy
         let missing = results.filter { $0.status == .missing }.count
         let completeness = 1 - Double(missing) / count
 
@@ -152,7 +158,8 @@ public enum PronunciationScorer {
         return PronunciationResult(
             words: results, extraWords: extras, recognizedText: recognizedText,
             accuracy: accuracy, fluency: fluency, completeness: completeness,
-            score: min(100, max(0, score)), speedRatio: speedRatio, longPauses: longPauses
+            score: min(100, max(0, score)), speedRatio: speedRatio, longPauses: longPauses,
+            sounds: sounds
         )
     }
 

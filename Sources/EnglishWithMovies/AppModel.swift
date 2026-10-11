@@ -284,7 +284,7 @@ final class AppModel: ObservableObject {
 
     /// Transcribes a recording of the user and scores it against the line.
     /// The expected sentence is not given to Whisper, so it cannot "guess" it.
-    func assess(recording: URL, line: TranscriptLine) async throws -> PronunciationResult {
+    func assess(recording: URL, line: TranscriptLine, phonemes: PhonemeEngine) async throws -> PronunciationResult {
         let modelURL: URL
         if model.isDownloaded {
             modelURL = model.localURL
@@ -294,8 +294,10 @@ final class AppModel: ObservableObject {
             try await ModelDownloader().download(.base) { _ in }
             modelURL = WhisperModel.base.localURL
         }
-        let heard = try await MediaTools().transcribe(wav: recording, model: modelURL) { _ in }
-        return PronunciationScorer.score(target: line, spoken: heard.lines.flatMap(\.words))
+        async let heard = MediaTools().transcribe(wav: recording, model: modelURL) { _ in }
+        // The sound analysis is a bonus: if it fails, the word-level score still works.
+        let sounds = try? await phonemes.analyze(recording: recording, line: line)
+        return PronunciationScorer.score(target: line, spoken: try await heard.lines.flatMap(\.words), sounds: sounds)
     }
 
     func togglePlay() {

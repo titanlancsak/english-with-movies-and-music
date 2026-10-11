@@ -13,7 +13,8 @@ let package = Package(
         // Reusable later by an iPhone/iPad app.
         .target(name: "LinguaCore"),
         // macOS app (SwiftUI).
-        .executableTarget(name: "EnglishWithMovies", dependencies: ["LinguaCore"]),
+        // Phonemes/ holds the setup scripts for the sound analysis; build-app.sh copies them into the .app.
+        .executableTarget(name: "EnglishWithMovies", dependencies: ["LinguaCore"], exclude: ["Phonemes"]),
         // Self-checks for LinguaCore. Run with: swift run LinguaCoreChecks
         // (A plain executable, because XCTest/Swift Testing need a full Xcode install.)
         .executableTarget(name: "LinguaCoreChecks", dependencies: ["LinguaCore"]),
