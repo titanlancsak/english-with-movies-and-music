@@ -7,6 +7,8 @@ public enum WhisperJSONParser {
     private struct Token: Decodable {
         let text: String
         let offsets: Offsets
+        /// Probability of the token.
+        let p: Double?
     }
     private struct Offsets: Decodable {
         let from: Int
@@ -32,14 +34,22 @@ public enum WhisperJSONParser {
 
                 let start = Double(token.offsets.from) / 1000
                 let end = Double(token.offsets.to) / 1000
-                let startsNewWord = text.hasPrefix(" ") && !isPunctuation(trimmed)
+                let punctuation = isPunctuation(trimmed)
+                let startsNewWord = text.hasPrefix(" ") && !punctuation
+                // Punctuation probabilities say nothing about how a word was pronounced.
+                let confidence = punctuation ? nil : token.p
 
                 if startsNewWord || words.isEmpty {
-                    words.append(TimedWord(text: trimmed, start: start, end: end))
+                    words.append(TimedWord(text: trimmed, start: start, end: end, confidence: confidence))
                 } else {
                     // Sub-word piece or punctuation: glue to the previous word.
-                    words[words.count - 1].text += trimmed
-                    words[words.count - 1].end = max(words[words.count - 1].end, end)
+                    // A word is only as certain as its least certain piece.
+                    let last = words.count - 1
+                    words[last].text += trimmed
+                    words[last].end = max(words[last].end, end)
+                    if let confidence {
+                        words[last].confidence = min(words[last].confidence ?? confidence, confidence)
+                    }
                 }
             }
             if !words.isEmpty { segmentBreaks.insert(words.count - 1) }

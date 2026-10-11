@@ -61,18 +61,40 @@ struct TranscriptView: View {
 private struct LineRow: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var translator: Translator
+    @EnvironmentObject private var practice: PracticeStore
     let line: TranscriptLine
     let isActive: Bool
     let activeWord: Int?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Button(timestamp(line.start)) { model.seek(to: line.start) }
-                .buttonStyle(.plain)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .help("Ir para esta fala")
-                .frame(width: 56, alignment: .trailing)
+            VStack(alignment: .trailing, spacing: 6) {
+                Button(timestamp(line.start)) { model.seek(to: line.start) }
+                    .buttonStyle(.plain)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .help("Ir para esta fala")
+                HStack(spacing: 4) {
+                    if let best = practice.record(for: line, source: model.sourceName)?.best {
+                        Text("\(best)")
+                            .font(.caption2.bold())
+                            .foregroundStyle(scoreColor(best))
+                            .padding(.horizontal, 4)
+                            .background(Capsule().fill(scoreColor(best).opacity(0.18)))
+                            .help("Sua melhor nota nesta fala")
+                    }
+                    Button {
+                        model.pause()
+                        model.practiceLine = line
+                    } label: {
+                        Image(systemName: "mic")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                    .help("Praticar a pronúncia desta fala (⌘R na fala atual)")
+                }
+            }
+            .frame(width: 64, alignment: .trailing)
 
             VStack(alignment: .leading, spacing: 4) {
                 FlowLayout(spacing: 5, lineSpacing: 4) {

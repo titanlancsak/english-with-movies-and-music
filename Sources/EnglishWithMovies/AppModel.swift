@@ -20,6 +20,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var activeLine: Int?
     @Published private(set) var activeWord: Int?
     @Published var followPlayback = true
+    /// The line being practiced (shows the practice sheet).
+    @Published var practiceLine: TranscriptLine?
     @Published var model: WhisperModel {
         didSet { UserDefaults.standard.set(model.rawValue, forKey: "whisperModel") }
     }
@@ -35,6 +37,11 @@ final class AppModel: ObservableObject {
     private var playbackURL: URL?
     /// Where to start playing once the player is ready.
     private var pendingSeek: Double?
+    /// Pauses playback at the end of a line played with `playSegment`.
+    private var segmentObserver: Any?
+
+    /// Name of the open movie or song, used to group practice history.
+    var sourceName: String? { mediaURL?.deletingPathExtension().lastPathComponent }
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "whisperModel")
@@ -248,6 +255,49 @@ final class AppModel: ObservableObject {
         player?.pause()
     }
 
+    // MARK: - Pronunciation practice
+
+    func practiceCurrentLine() {
+        guard let transcript, let index = activeLine ?? (transcript.lines.isEmpty ? nil : 0) else { return }
+        pause()
+        practiceLine = transcript.lines[index]
+    }
+
+    /// Plays only this line, then pauses.
+    func playSegment(_ line: TranscriptLine) {
+        guard let player else { return }
+        stopSegment()
+        seek(to: line.start)
+        let end = CMTime(seconds: line.end + 0.2, preferredTimescale: 600)
+        segmentObserver = player.addBoundaryTimeObserver(forTimes: [NSValue(time: end)], queue: .main) { [weak self] in
+            MainActor.assumeIsolated { self?.stopSegment() }
+        }
+        player.play()
+    }
+
+    func stopSegment() {
+        guard let segmentObserver else { return }
+        player?.pause()
+        player?.removeTimeObserver(segmentObserver)
+        self.segmentObserver = nil
+    }
+
+    /// Transcribes a recording of the user and scores it against the line.
+    /// The expected sentence is not given to Whisper, so it cannot "guess" it.
+    func assess(recording: URL, line: TranscriptLine) async throws -> PronunciationResult {
+        let modelURL: URL
+        if model.isDownloaded {
+            modelURL = model.localURL
+        } else if let downloaded = WhisperModel.allCases.first(where: \.isDownloaded) {
+            modelURL = downloaded.localURL
+        } else {
+            try await ModelDownloader().download(.base) { _ in }
+            modelURL = WhisperModel.base.localURL
+        }
+        let heard = try await MediaTools().transcribe(wav: recording, model: modelURL) { _ in }
+        return PronunciationScorer.score(target: line, spoken: heard.lines.flatMap(\.words))
+    }
+
     func togglePlay() {
         guard let player else { return }
         player.timeControlStatus == .playing ? player.pause() : player.play()
@@ -267,6 +317,7 @@ final class AppModel: ObservableObject {
     }
 
     private func tearDownPlayer() {
+        stopSegment()
         if let timeObserver { player?.removeTimeObserver(timeObserver) }
         timeObserver = nil
         player?.pause()

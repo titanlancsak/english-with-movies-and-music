@@ -7,6 +7,7 @@ struct EnglishWithMoviesApp: App {
     @StateObject private var model = AppModel()
     @StateObject private var savedWords = SavedWordsStore()
     @StateObject private var translator = Translator()
+    @StateObject private var practice = PracticeStore()
 
     var body: some Scene {
         WindowGroup("English with Movies & Music") {
@@ -14,6 +15,7 @@ struct EnglishWithMoviesApp: App {
                 .environmentObject(model)
                 .environmentObject(savedWords)
                 .environmentObject(translator)
+                .environmentObject(practice)
                 .modifier(TranslationHost(translator: translator))
                 .frame(minWidth: 820, minHeight: 620)
                 .onAppear { delegate.model = model }
@@ -28,9 +30,13 @@ struct EnglishWithMoviesApp: App {
             CommandMenu("Reprodução") {
                 Button("Play / Pause") { model.togglePlay() }
                     .keyboardShortcut("p")
+                Button("Praticar a fala atual") { model.practiceCurrentLine() }
+                    .keyboardShortcut("r")
+                    .disabled(model.transcript == nil)
             }
             CommandGroup(after: .windowArrangement) {
                 OpenSavedWordsButton()
+                OpenPracticeHistoryButton()
             }
         }
 
@@ -41,6 +47,12 @@ struct EnglishWithMoviesApp: App {
                 .environmentObject(translator)
         }
         .defaultSize(width: 560, height: 640)
+
+        Window("Histórico de pronúncia", id: "practice-history") {
+            PracticeHistoryView()
+                .environmentObject(practice)
+        }
+        .defaultSize(width: 600, height: 620)
     }
 }
 
@@ -103,6 +115,16 @@ private struct OpenSavedWordsButton: View {
     var body: some View {
         Button("Palavras salvas") { openWindow(id: "saved-words") }
             .keyboardShortcut("s", modifiers: [.command, .shift])
+    }
+}
+
+/// Menu item (⇧⌘H) that opens the pronunciation history window.
+private struct OpenPracticeHistoryButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Histórico de pronúncia") { openWindow(id: "practice-history") }
+            .keyboardShortcut("h", modifiers: [.command, .shift])
     }
 }
 

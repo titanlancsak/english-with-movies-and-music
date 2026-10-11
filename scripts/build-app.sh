@@ -27,6 +27,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleVersion</key><string>1</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSMicrophoneUsageDescription</key><string>O microfone é usado para avaliar a sua pronúncia das falas.</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.education</string>
     <key>CFBundleDocumentTypes</key>
     <array>

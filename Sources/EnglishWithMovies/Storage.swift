@@ -12,6 +12,8 @@ enum AppFolders {
     static let models = folder("models")
     static let transcripts = folder("transcripts")
     static let work = folder("work")
+    /// Temporary microphone recordings, deleted when the practice sheet closes.
+    static let practice = folder("practice")
 
     /// Videos downloaded from links, kept where the user can find them.
     static let downloads: URL = {

@@ -5,11 +5,14 @@ public struct TimedWord: Codable, Hashable, Sendable {
     public var text: String
     public var start: Double
     public var end: Double
+    /// How sure the speech recognizer was (0...1), when known.
+    public var confidence: Double?
 
-    public init(text: String, start: Double, end: Double) {
+    public init(text: String, start: Double, end: Double, confidence: Double? = nil) {
         self.text = text
         self.start = start
         self.end = end
+        self.confidence = confidence
     }
 }
 

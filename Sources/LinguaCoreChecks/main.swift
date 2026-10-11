@@ -149,5 +149,49 @@ check(quiet.lines.map(\.text) == ["Who's there?"], "sound: empty lines removed")
 check(quiet.lines.first?.id == 0 && quiet.lines.first?.start == 4.5, "sound: line ids and timing updated")
 check(SRTParser.parse("1\n00:00:01,000 --> 00:00:02,000\n[THUNDER RUMBLES]\n\n2\n00:00:03,000 --> 00:00:04,000\nRun!\n").lines.map(\.text) == ["Run!"], "sound: SRT annotations removed")
 
+// MARK: Pronunciation
+
+func spoken(_ text: String, start: Double = 0, step: Double = 0.4, confidence: Double = 0.9) -> [TimedWord] {
+    text.split(separator: " ").enumerated().map {
+        TimedWord(text: String($1), start: start + Double($0) * step, end: start + Double($0) * step + 0.3, confidence: confidence)
+    }
+}
+let line = TranscriptLine(id: 0, start: 10, end: 12.8, words: spoken("We need to leave the harbor before sunset.", start: 10))
+
+let perfect = PronunciationScorer.score(target: line, spoken: spoken("We need to leave the harbor before sunset."))
+check(perfect.score >= 95 && perfect.words.allSatisfy { $0.status == .correct }, "pronunciation: perfect attempt scores high (\(perfect.score))")
+
+let oneWrong = PronunciationScorer.score(target: line, spoken: spoken("We need to leave the harvard before sunset"))
+check(oneWrong.words.map(\.status) == [.correct, .correct, .correct, .correct, .correct, .wrong, .correct, .correct], "pronunciation: one wrong word, rest aligned")
+check(oneWrong.words[5].heard == "harvard" && oneWrong.score < 90, "pronunciation: a wrong word is not 'excellent' (\(oneWrong.score))")
+
+let partial = PronunciationScorer.score(target: line, spoken: spoken("We need to leave"))
+check(partial.words.filter { $0.status == .missing }.count == 4 && partial.completeness == 0.5, "pronunciation: missing words")
+check(partial.score < 60, "pronunciation: half a sentence scores low (\(partial.score))")
+check(!partial.tips.contains { $0.contains("rápido") }, "pronunciation: half a sentence is not 'too fast'")
+
+let mumbled = PronunciationScorer.score(target: line, spoken: spoken("We need to leave the harbor before sunset.", confidence: 0.2))
+check(mumbled.words.allSatisfy { $0.status == .unsure } && mumbled.score < perfect.score, "pronunciation: low confidence is unsure (\(mumbled.score))")
+
+let slow = PronunciationScorer.score(target: line, spoken: spoken("We need to leave the harbor before sunset.", step: 1.2))
+check(slow.speedRatio ?? 0 > 2 && slow.longPauses > 0 && slow.score < perfect.score, "pronunciation: slow speech lowers fluency (\(slow.score))")
+check(slow.tips.contains { $0.contains("devagar") }, "pronunciation: tip about speed")
+
+let silent = PronunciationScorer.score(target: line, spoken: [])
+check(silent.score == 0 && silent.tips.first?.contains("microfone") == true, "pronunciation: nothing said")
+
+let numbers = TranscriptLine(id: 1, start: 0, end: 2, words: spoken("four three two one"))
+check(PronunciationScorer.score(target: numbers, spoken: spoken("4 3 2 1")).score >= 95, "pronunciation: digits match spelled numbers")
+check(PronunciationScorer.similarity("harbor", "harbour") >= 0.8, "pronunciation: similar spellings are close")
+
+var history = PracticeHistory()
+history.add(PracticeAttempt(result: oneWrong), sentence: line.text, source: "Film", lineStart: line.start)
+history.add(PracticeAttempt(result: perfect), sentence: line.text, source: "Film", lineStart: line.start)
+history.add(PracticeAttempt(result: partial), sentence: "Another line", source: "Film", lineStart: 20)
+let record = history.record(sentence: line.text, source: "Film")
+check(record?.attempts.count == 2 && record?.best == perfect.score, "history: attempts and best score per sentence")
+check(history.attemptCount == 3 && history.recent.first?.sentence == "Another line", "history: counts and most recent first")
+check(history.averageScore == (perfect.score + partial.score + 1) / 2 || history.averageScore == (perfect.score + partial.score) / 2, "history: average of latest scores")
+
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
 exit(failures == 0 ? 0 : 1)

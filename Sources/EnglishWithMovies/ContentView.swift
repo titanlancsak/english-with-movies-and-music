@@ -6,6 +6,7 @@ struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var savedWords: SavedWordsStore
     @EnvironmentObject private var translator: Translator
+    @EnvironmentObject private var practice: PracticeStore
     @Environment(\.openWindow) private var openWindow
     @ViewState private var isDropTargeted = false
     @ViewState private var showLinkSheet = false
@@ -34,6 +35,11 @@ struct ContentView: View {
         .sheet(isPresented: $showLinkSheet) {
             LinkSheet { link in model.download(from: link) }
         }
+        .sheet(item: $model.practiceLine) { line in
+            PracticeView(line: line)
+                .environmentObject(model)
+                .environmentObject(practice)
+        }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             guard let provider = providers.first else { return false }
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
@@ -61,6 +67,10 @@ struct ContentView: View {
                     openWindow(id: "saved-words")
                 }
                 .help("Palavras salvas (⇧⌘S)")
+                Button("Histórico de pronúncia", systemImage: "chart.bar.xaxis") {
+                    openWindow(id: "practice-history")
+                }
+                .help("Histórico de pronúncia (⇧⌘H)")
                 Button("Limpar cópias", systemImage: "trash") { cleanupSize = model.convertedCopiesSize() }
                     .help("Apagar as cópias convertidas para liberar espaço")
                     .disabled(model.isBusy)
