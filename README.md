@@ -14,6 +14,8 @@
   &nbsp;·&nbsp;
   <a href="https://github.com/titanlancsak/english-with-movies-and-music/releases/latest/download/EnglishWithMovies-Windows.zip"><b>⬇️ Baixar para Windows</b></a>
   &nbsp;·&nbsp;
+  <a href="https://github.com/titanlancsak/english-with-movies-and-music/releases/latest/download/EnglishWithMovies-Android.apk"><b>⬇️ Baixar para Android</b></a>
+  &nbsp;·&nbsp;
   <a href="https://github.com/titanlancsak/english-with-movies-and-music/releases">Todas as versões</a>
 </p>
 
@@ -23,32 +25,35 @@
 
 Você abre um filme, uma série ou uma música em inglês, e o app:
 
-1. **transcreve tudo o que é falado** usando inteligência artificial no seu próprio computador (grátis e sem enviar o áudio para lugar nenhum);
+1. **transcreve tudo o que é falado** usando inteligência artificial no seu próprio computador ou celular (grátis e sem enviar o áudio para lugar nenhum);
 2. mostra a **legenda embaixo do vídeo**, com a fala atual em **negrito** e a palavra dita no momento destacada;
-3. deixa você **clicar em qualquer palavra** para ver o significado, a pronúncia, a tradução e até **3 exemplos de frases**;
+3. deixa você **clicar (ou tocar) em qualquer palavra** para ver o significado, a pronúncia, a tradução e até **3 exemplos de frases**;
 4. ajuda você a **guardar e revisar** as palavras novas e a **treinar a pronúncia** repetindo as falas dos personagens no microfone.
 
 Tudo é gratuito: o app e todas as ferramentas que ele usa são de código aberto.
 
 ## Funcionalidades
 
-| | Mac | Windows |
-|---|:---:|:---:|
-| 🎬 **Biblioteca estilo Netflix**: capas, "Continuar assistindo", downloads, filmes e músicas | ✅ | ✅ |
-| ⏯️ **Continua de onde você parou** | ✅ | ✅ |
-| 📝 **Transcrição automática** das falas com o tempo de cada palavra (Whisper, offline) | ✅ | ✅ |
-| 🔤 **Legenda em tempo real**: fala atual em negrito e palavra atual destacada | ✅ | ✅ |
-| ⏩ A legenda **acompanha quando você avança ou volta** o vídeo | ✅ | ✅ |
-| 📖 **Clique na palavra**: significado, pronúncia e até 3 exemplos | ✅ | ✅ |
-| 🇧🇷 **Tradução para o português** da palavra e da frase | ✅ (offline) | ✅ (online) |
-| 📥 **Baixar vídeos do YouTube** colando o link | ✅ | ✅ |
-| 🔇 Remove descrições de som como `[Music]`, `(background music playing)`, `♪` | ✅ | ✅ |
-| 📄 Importa legendas `.srt` (pula a transcrição) | ✅ | ✅ |
-| 🔖 **Palavras salvas** com a frase do filme, busca e exportação **CSV para o Anki** | ✅ | ✅ |
-| 🃏 **Revisão com cartões** e repetição espaçada (como o Anki), 3 modos | ✅ | ✅ |
-| 🎤 **Treino de pronúncia**: repita a fala do personagem e receba uma **nota de 0 a 100** | ✅ | ✅ |
-| 📊 **Histórico de notas** por fala, com a evolução | ✅ | ✅ |
-| 👄 **Análise som a som** (fonemas): mostra qual som saiu errado, como o "th" | ✅ (opcional) | ✅ (opcional) |
+| | Mac | Windows | Android |
+|---|:---:|:---:|:---:|
+| 🎬 **Biblioteca estilo Netflix**: capas, "Continuar assistindo", filmes e músicas | ✅ | ✅ | ✅ |
+| ⏯️ **Continua de onde você parou** | ✅ | ✅ | ✅ |
+| 📝 **Transcrição automática** das falas com o tempo de cada palavra (Whisper, offline) | ✅ | ✅ | ✅ |
+| 🔤 **Legenda em tempo real**: fala atual em negrito e palavra atual destacada | ✅ | ✅ | ✅ |
+| ⏩ A legenda **acompanha quando você avança ou volta** o vídeo | ✅ | ✅ | ✅ |
+| 📖 **Clique na palavra**: significado, pronúncia e até 3 exemplos | ✅ | ✅ | ✅ |
+| 🇧🇷 **Tradução para o português** da palavra e da frase | ✅ (offline) | ✅ (online) | ✅ (online) |
+| 📥 **Baixar vídeos do YouTube** colando o link | ✅ | ✅ | — ¹ |
+| 🔇 Remove descrições de som como `[Music]`, `(background music playing)`, `♪` | ✅ | ✅ | ✅ |
+| 📄 Importa legendas `.srt` (pula a transcrição) | ✅ | ✅ | ✅ |
+| 🔖 **Palavras salvas** com a frase do filme, busca e exportação **CSV para o Anki** | ✅ | ✅ | ✅ |
+| 🃏 **Revisão com cartões** e repetição espaçada (como o Anki), 3 modos | ✅ | ✅ | ✅ |
+| 🎤 **Treino de pronúncia**: repita a fala do personagem e receba uma **nota de 0 a 100** | ✅ | ✅ | ✅ |
+| 📊 **Histórico de notas** por fala, com a evolução | ✅ | ✅ | ✅ |
+| 👄 **Análise som a som** (fonemas): mostra qual som saiu errado, como o "th" | ✅ (opcional) | ✅ (opcional) | — ² |
+
+¹ As lojas de aplicativos não permitem apps que baixam vídeos do YouTube. No celular, use arquivos que já estão no aparelho.
+² Ainda não disponível no celular.
 
 ### Como é a nota de pronúncia
 
@@ -90,6 +95,20 @@ Requisitos: Windows 10 ou 11 (64 bits). Não precisa instalar mais nada: as ferr
 3. Abra a pasta extraída e dê dois cliques em **english_with_movies.exe**.
 4. **Na primeira vez**, o Windows pode mostrar *“O Windows protegeu o computador”* (o app não tem um certificado pago). Clique em **Mais informações › Executar assim mesmo**.
 
+### 🤖 Android
+
+Requisitos: Android 7 ou mais novo, celular de 64 bits (praticamente todos os aparelhos dos últimos 6 anos). O app tem uns 20 MB.
+
+1. No celular, baixe **[EnglishWithMovies-Android.apk](https://github.com/titanlancsak/english-with-movies-and-music/releases/latest/download/EnglishWithMovies-Android.apk)**.
+2. Abra o arquivo baixado (pela notificação ou pelo app **Arquivos › Downloads**).
+3. **Na primeira vez**, o Android pede para permitir a instalação de apps desta fonte (o app não está na Play Store). Toque em **Configurações**, ative **Permitir desta fonte**, volte e toque em **Instalar**.
+4. Se o Play Protect avisar que o app é desconhecido, toque em **Mais detalhes › Instalar mesmo assim**.
+
+No celular:
+- Toque em **Escolher arquivo…** e escolha um filme ou música que esteja no aparelho. O app guarda uma cópia na biblioteca dele (dá para apagar depois, segurando o dedo na capa).
+- A primeira transcrição baixa o modelo de reconhecimento de voz (**148 MB**, uma vez só). Use Wi-Fi.
+- A transcrição roda no próprio celular: um filme de 2 horas leva por volta de 20 a 40 minutos num celular recente. Deixe o app aberto; a tela fica acesa enquanto isso. Músicas e cenas curtas ficam prontas em segundos. Com uma legenda `.srt` (menu ⋮ › **Importar legenda**), não é preciso esperar.
+
 ### Primeiro uso (Mac e Windows)
 
 - Arraste um filme ou música para a janela, clique em **Escolher arquivo…** ou em **Baixar do YouTube…**.
@@ -114,20 +133,20 @@ Requisitos: Windows 10 ou 11 (64 bits). Não precisa instalar mais nada: as ferr
 
 ## Tecnologias utilizadas
 
-| Parte | Mac | Windows |
+| Parte | Mac | Windows e Android |
 |---|---|---|
 | Linguagem e interface | Swift 6 + SwiftUI | Dart + [Flutter](https://flutter.dev) |
 | Player de vídeo | AVKit (AVPlayerView) | [media_kit](https://github.com/media-kit/media-kit) (libmpv) |
-| Transcrição | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) com aceleração Metal | whisper.cpp (CPU) |
+| Transcrição | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) com aceleração Metal | whisper.cpp (CPU; no Android, compilado para ARM, com uma versão rápida para processadores com instruções *dot product*) |
 | Áudio e conversão de vídeo | [FFmpeg](https://ffmpeg.org) | FFmpeg |
-| Download de vídeos | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | yt-dlp |
+| Download de vídeos | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | yt-dlp (só Windows) |
 | Dicionário | Dicionário do macOS (offline) + [Free Dictionary API](https://dictionaryapi.dev) | [Wiktionary](https://en.wiktionary.org) + Free Dictionary API |
 | Tradução | [Translation](https://developer.apple.com/documentation/translation) da Apple (offline) | [MyMemory](https://mymemory.translated.net) (online, ~5.000 caracteres/dia grátis) |
-| Pronúncia (voz) | AVSpeechSynthesizer | flutter_tts (vozes do Windows) |
+| Pronúncia (voz) | AVSpeechSynthesizer | flutter_tts (vozes do Windows / do Android) |
 | Microfone | AVAudioRecorder | [record](https://pub.dev/packages/record) |
-| Análise som a som | [wav2vec2 de fonemas da Meta](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) em ONNX (Python) + [espeak-ng](https://github.com/espeak-ng/espeak-ng) | o mesmo modelo e o mesmo analisador, empacotado com PyInstaller; espeak-ng incluído no app |
+| Análise som a som | [wav2vec2 de fonemas da Meta](https://huggingface.co/facebook/wav2vec2-lv-60-espeak-cv-ft) em ONNX (Python) + [espeak-ng](https://github.com/espeak-ng/espeak-ng) | Windows: o mesmo modelo e o mesmo analisador, empacotado com PyInstaller; espeak-ng incluído no app |
 | Repetição espaçada | SM-2 (implementação própria) | SM-2 (implementação própria) |
-| Build do Windows | — | GitHub Actions (compila, empacota e testa num Windows real) |
+| Builds | — | GitHub Actions: Windows (compila, empacota e testa num Windows real) e Android (compila o whisper.cpp e o FFmpeg para ARM e gera o APK assinado) |
 
 ### Como funciona por dentro
 
@@ -138,7 +157,7 @@ arquivo (mp4, mkv, mp3…)  ou  link do YouTube ──yt-dlp──┐
         ▼
 whisper.cpp: transcreve e marca o tempo de cada palavra
         ▼
-núcleo (LinguaCore no Mac, lib/core no Windows):
+núcleo (LinguaCore no Mac, lib/core no Windows e no Android):
   • monta as frases e remove "[Music]", "♪"…
   • acompanha o vídeo e acha a fala e a palavra do momento
   • dicionário, tradução, palavras salvas, revisão, nota de pronúncia
@@ -148,7 +167,7 @@ interface: player em cima, legenda interativa embaixo
 
 ### Privacidade
 
-O áudio dos seus filmes e a sua voz **nunca saem do seu computador**: a transcrição e a avaliação de pronúncia rodam localmente. A internet é usada só para baixar os modelos na primeira vez, para baixar vídeos que você pedir, para o dicionário e (no Windows) para a tradução.
+O áudio dos seus filmes e a sua voz **nunca saem do seu computador ou celular**: a transcrição e a avaliação de pronúncia rodam localmente. A internet é usada só para baixar os modelos na primeira vez, para baixar vídeos que você pedir, para o dicionário e (no Windows e no Android) para a tradução.
 
 ---
 
@@ -168,13 +187,23 @@ swift run LinguaCoreChecks              # verificações automáticas da lógica
 ### Windows
 
 ```sh
-cd app-windows
+cd app-flutter
 flutter pub get
 dart test test/core_test.dart           # testes da lógica
 flutter build windows --release
 ```
 
-O executável fica em `app-windows/build/windows/x64/runner/Release`. Para funcionar, coloque `ffmpeg.exe`, `ffprobe.exe` (e DLLs), `yt-dlp.exe` a pasta do whisper.cpp e, para a análise som a som, `espeak-ng/` e o analisador `phonemes/` em `Release/tools/` — o workflow [`.github/workflows/windows.yml`](.github/workflows/windows.yml) faz isso automaticamente e publica o `.zip` a cada versão.
+O executável fica em `app-flutter/build/windows/x64/runner/Release`. Para funcionar, coloque `ffmpeg.exe`, `ffprobe.exe` (e DLLs), `yt-dlp.exe` a pasta do whisper.cpp e, para a análise som a som, `espeak-ng/` e o analisador `phonemes/` em `Release/tools/` — o workflow [`.github/workflows/windows.yml`](.github/workflows/windows.yml) faz isso automaticamente e publica o `.zip` a cada versão.
+
+### Android
+
+```sh
+cd app-flutter
+android/native-tools/build.sh           # compila whisper-cli e ffmpeg para ARM (precisa do Android NDK)
+flutter build apk --release --target-platform android-arm64
+```
+
+O APK fica em `app-flutter/build/app/outputs/flutter-apk/app-release.apk`. O workflow [`.github/workflows/android.yml`](.github/workflows/android.yml) faz isso automaticamente, assina o APK e o publica a cada versão.
 
 ## Estrutura do projeto
 
@@ -187,12 +216,13 @@ Sources/
   LinguaCoreChecks/          Mac: verificações automáticas
 scripts/                     Mac: gerar o .app, o .zip e o ícone
 Resources/                   ícone do app
-app-windows/                 Windows: app Flutter
+app-flutter/                 Windows e Android: app Flutter
   lib/core/                  lógica (a mesma do Mac, em Dart)
   lib/services/              ferramentas, dicionário, tradução, armazenamento
   lib/ui/                    telas
   test/                      testes
-.github/workflows/           build automático do Windows
+  android/native-tools/      Android: compila whisper.cpp e FFmpeg para ARM
+.github/workflows/           builds automáticos do Windows e do Android
 ```
 
 ## Uso responsável
@@ -203,4 +233,4 @@ Baixe e use apenas conteúdo que você tem direito de assistir. Muitos vídeos d
 
 [MIT](LICENSE) © 2026 Santos Lucas.
 
-As ferramentas usadas pelo app têm as suas próprias licenças: FFmpeg (GPL/LGPL), whisper.cpp (MIT), yt-dlp (Unlicense), espeak-ng (GPL-3.0), modelo wav2vec2 de fonemas (Apache 2.0), modelos Whisper (MIT). Veja [`THIRD_PARTY_NOTICES.txt`](app-windows/windows-release/THIRD_PARTY_NOTICES.txt).
+As ferramentas usadas pelo app têm as suas próprias licenças: FFmpeg (GPL no Windows, LGPL no Android), whisper.cpp (MIT), yt-dlp (Unlicense), espeak-ng (GPL-3.0), modelo wav2vec2 de fonemas (Apache 2.0), modelos Whisper (MIT). Veja [`THIRD_PARTY_NOTICES.txt`](app-flutter/windows-release/THIRD_PARTY_NOTICES.txt).

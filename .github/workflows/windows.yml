@@ -1,13 +1,13 @@
 name: Windows
 
-# Builds the Windows version (app-windows/), bundles the free tools it needs,
+# Builds the Windows version (app-flutter/), bundles the free tools it needs,
 # runs an end-to-end smoke test on a real Windows machine and, for version tags,
 # attaches EnglishWithMovies-Windows.zip to the GitHub release.
 on:
   push:
     branches: [main]
     tags: ['v*']
-    paths: ['app-windows/**', 'Sources/EnglishWithMovies/Phonemes/worker.py', '.github/workflows/windows.yml']
+    paths: ['app-flutter/**', 'Sources/EnglishWithMovies/Phonemes/worker.py', '.github/workflows/windows.yml']
   workflow_dispatch:
 
 permissions:
@@ -25,7 +25,7 @@ jobs:
     defaults:
       run:
         shell: pwsh
-        working-directory: app-windows
+        working-directory: app-flutter
     steps:
       - uses: actions/checkout@v4
 
