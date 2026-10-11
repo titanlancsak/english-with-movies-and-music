@@ -253,5 +253,69 @@ check(deck.nextDueDate(after: start) == start.addingTimeInterval(day), "review: 
 deck.add(SavedWord(word: "storm", definition: "saved again"))
 check(deck.words.first?.review?.interval == 1, "review: saving a word again keeps its progress")
 
+// MARK: Uncommon words
+
+check(!CommonWords.isUncommon("the") && !CommonWords.isUncommon("running") && !CommonWords.isUncommon("didn't"), "uncommon: common words and their forms")
+check(CommonWords.isUncommon("harbor") || CommonWords.isUncommon("sunset"), "uncommon: rarer words are found")
+check(!CommonWords.isUncommon("Juan") && CommonWords.isUncommon("Serendipity", atSentenceStart: true), "uncommon: names skipped, sentence start checked")
+check(!CommonWords.isUncommon("ok") && !CommonWords.isUncommon("1984"), "uncommon: short words and numbers skipped")
+
+// MARK: Daily goal and streak
+
+var study = StudyLog()
+let today = Date()
+let calendar = Calendar.current
+func daysAgo(_ n: Int) -> Date { calendar.date(byAdding: .day, value: -n, to: today)! }
+study.add(700, device: "mac", on: daysAgo(1))
+study.add(650, device: "mac", on: daysAgo(2))
+study.add(100, device: "mac", on: daysAgo(3))
+check(study.streak(now: today) == 2, "study: streak counts from yesterday while today is not done (\(study.streak(now: today)))")
+study.add(300, device: "mac", on: today)
+study.add(300, device: "phone", on: today)
+check(study.streak(now: today) == 3 && study.todayProgress(now: today) == 1, "study: today's goal reached on two devices")
+var otherStudy = StudyLog()
+otherStudy.add(900, device: "phone", on: today)
+study.merge(otherStudy)
+check(study.seconds(on: today) == 1200, "study: merge keeps the larger value per device and day")
+
+// MARK: Updates, search, covers
+
+check(AppVersion.isNewer("v1.10.0", than: "1.9.2") && !AppVersion.isNewer("1.2.0", than: "1.2.0") && !AppVersion.isNewer("sound-model", than: "1.0"), "version: comparison")
+let searchable = Transcript(lines: [TranscriptLine(id: 0, start: 0, end: 1, words: words("Café time")), TranscriptLine(id: 1, start: 2, end: 3, words: words("No coffee"))])
+check(searchable.lineIndices(matching: "cafe") == [0] && searchable.lineIndices(matching: "  ").isEmpty, "search: case and accent insensitive")
+check(CropDetect.crop(fromFFmpegOutput: "x crop=1920:1072:0:4 y\n[x] crop=1920:800:0:140", width: 1920, height: 1080) == "crop=1920:800:0:140"
+      && CropDetect.crop(fromFFmpegOutput: "crop=1920:1080:0:0", width: 1920, height: 1080) == nil
+      && CropDetect.crop(fromFFmpegOutput: "crop=640:96:600:400") == nil, "covers: black bars detected, full frame and dark scenes ignored")
+
+// MARK: Sync between devices
+
+let syncURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../data/sync-example.json")
+do {
+    let remote = try JSONDecoder().decode(SyncDocument.self, from: Data(contentsOf: syncURL))
+    check(remote.words.count == 2 && remote.words[0].review?.interval == 3 && remote.deletedWords["storm"] != nil, "sync: reads the shared example file")
+    var localWords = WordList()
+    localWords.add(SavedWord(word: "storm", dateAdded: Date(timeIntervalSince1970: 1_791_000_000)))  // before the deletion
+    localWords.add(SavedWord(word: "harbor", translation: "porto (antigo)", dateAdded: Date(timeIntervalSince1970: 1_700_000_000)))
+    localWords.add(SavedWord(word: "sunset", dateAdded: Date()))
+    var localPractice = PracticeHistory()
+    var localStudy = StudyLog()
+    localStudy.goalMinutes = 15
+    SyncDocument.merge(remote, into: &localWords, practice: &localPractice, study: &localStudy)
+    check(Set(localWords.words.map(\.key)) == ["harbor", "journey", "sunset"], "sync: union of words, deletion applied")
+    check(localWords.words.first { $0.key == "harbor" }?.translation == "porto", "sync: newest copy wins")
+    check(localPractice.attemptCount == 1 && localStudy.goalMinutes == 15, "sync: practice merged, local goal kept")
+    SyncDocument.merge(remote, into: &localWords, practice: &localPractice, study: &localStudy)
+    check(localPractice.attemptCount == 1, "sync: merging twice does not duplicate")
+    let roundTrip = try JSONDecoder().decode(SyncDocument.self, from: JSONEncoder().encode(SyncDocument(words: localWords, practice: localPractice, study: localStudy)))
+    check(roundTrip.words.count == 3 && roundTrip.practice.first?.attempts.count == 1, "sync: write and read back")
+    var deleting = localWords
+    deleting.remove("sunset")
+    let afterDelete = SyncDocument(words: deleting, practice: localPractice, study: localStudy)
+    SyncDocument.merge(afterDelete, into: &localWords, practice: &localPractice, study: &localStudy)
+    check(!localWords.contains("sunset"), "sync: a deletion on another device removes the word")
+} catch {
+    check(false, "sync: \(error)")
+}
+
 print(failures == 0 ? "\nAll checks passed." : "\n\(failures) check(s) failed.")
 exit(failures == 0 ? 0 : 1)

@@ -43,6 +43,13 @@ final class SavedWordsStore: ObservableObject {
         try list.csv().write(to: url, atomically: true, encoding: .utf8)
     }
 
+    /// After merging another device's data (see SyncService).
+    func replace(with list: WordList) {
+        guard list != self.list else { return }
+        self.list = list
+        persist()
+    }
+
     private func persist() {
         keys = list.keys
         let encoder = JSONEncoder()

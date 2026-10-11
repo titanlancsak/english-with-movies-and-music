@@ -7,6 +7,7 @@ struct LibraryView: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var savedWords: SavedWordsStore
     @EnvironmentObject private var practice: PracticeStore
+    @EnvironmentObject private var study: StudyStore
     @Binding var showLinkSheet: Bool
     @ViewState private var deleteCandidate: LibraryItem?
 
@@ -49,6 +50,7 @@ struct LibraryView: View {
             }
             .fixedSize()
             Spacer(minLength: 20)
+            GoalCard()
             StatCard(value: "\(savedWords.list.words.count)", title: "palavras salvas", icon: "bookmark.fill", tint: Theme.indigo) {
                 model.section = .savedWords
             }
@@ -105,6 +107,63 @@ struct LibraryView: View {
         } else {
             library.forget(item)
         }
+    }
+}
+
+/// The daily goal: days in a row and today's progress; clicking changes the goal.
+private struct GoalCard: View {
+    @EnvironmentObject private var study: StudyStore
+
+    var body: some View {
+        let progress = study.log.todayProgress()
+        let streak = study.log.streak()
+        Menu {
+            Section("Meta diária") {
+                ForEach([5, 10, 15, 20, 30, 45, 60], id: \.self) { minutes in
+                    Button { study.goalMinutes = minutes } label: {
+                        if minutes == study.goalMinutes {
+                            Label("\(minutes) min por dia", systemImage: "checkmark")
+                        } else {
+                            Text("\(minutes) min por dia")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().stroke(Color.white.opacity(0.1), lineWidth: 4)
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(Theme.warm, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(streak > 0 ? Theme.orange : Theme.textDim)
+                }
+                .frame(width: 32, height: 32)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(streak == 1 ? "1 dia" : "\(streak) dias").font(.system(size: 18, weight: .heavy).monospacedDigit())
+                    Text("hoje: \(min(study.todayMinutes, 999))/\(study.goalMinutes) min")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(progress >= 1 ? Theme.orange : Theme.textDim)
+                }
+                .fixedSize()
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 16)
+            .padding(.vertical, 9)
+            .glassCard(cornerRadius: 14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Theme.orange.opacity(progress >= 1 ? 0.6 : 0), lineWidth: 1)
+            )
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sequência de dias em que você atingiu a meta. Assistir, revisar e praticar contam. Clique para mudar a meta.")
     }
 }
 

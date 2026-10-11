@@ -43,7 +43,25 @@ enum MediaFiles {
         let transcripts = WhisperModel.allCases.map {
             AppFolders.transcripts.appendingPathComponent(TranscriptCache.key(for: url, model: $0.rawValue) + ".json")
         }
-        ([url, converted] + transcripts).forEach { try? fileManager.removeItem(at: $0) }
+        let subtitles = siblingSubtitles(for: url).map { [$0] } ?? []
+        ([url, converted] + transcripts + subtitles).forEach { try? fileManager.removeItem(at: $0) }
+    }
+
+    /// English subtitles next to the video: "Film.srt", "Film.en.srt", "Film.en-US.srt"…
+    /// (yt-dlp saves YouTube's subtitles this way; many film downloads come with one too).
+    static func siblingSubtitles(for media: URL) -> URL? {
+        let folder = media.deletingLastPathComponent()
+        let base = media.deletingPathExtension().lastPathComponent
+        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        let candidates = files.filter { file in
+            guard file.pathExtension.lowercased() == "srt" else { return false }
+            let name = file.deletingPathExtension().lastPathComponent
+            if name == base { return true }
+            guard name.hasPrefix(base + ".") else { return false }
+            return name.dropFirst(base.count + 1).lowercased().hasPrefix("en")
+        }
+        // Prefer plain English ("en") over regional variants.
+        return candidates.min { $0.lastPathComponent.count < $1.lastPathComponent.count }
     }
 
     /// yt-dlp pieces of an unfinished download, e.g. "x.mp4.part" or "x.f137.mp4".

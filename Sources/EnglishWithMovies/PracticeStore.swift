@@ -29,6 +29,13 @@ final class PracticeStore: ObservableObject {
         persist()
     }
 
+    /// After merging another device's data (see SyncService).
+    func replace(with history: PracticeHistory) {
+        guard history != self.history else { return }
+        self.history = history
+        persist()
+    }
+
     private func persist() {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

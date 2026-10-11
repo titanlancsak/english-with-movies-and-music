@@ -254,6 +254,16 @@ public struct PracticeAttempt: Codable, Hashable, Identifiable, Sendable {
     public var completeness: Double
     public var recognizedText: String
 
+    /// An attempt read from a sync file (which keeps only the score and the recognized text).
+    public init(date: Date, score: Int, recognizedText: String) {
+        self.date = date
+        self.score = score
+        accuracy = 0
+        fluency = 0
+        completeness = 0
+        self.recognizedText = recognizedText
+    }
+
     public init(result: PronunciationResult, date: Date = Date()) {
         self.date = date
         score = result.score
@@ -278,7 +288,7 @@ public struct PracticeRecord: Codable, Hashable, Identifiable, Sendable {
 }
 
 public struct PracticeHistory: Codable, Hashable, Sendable {
-    public private(set) var records: [String: PracticeRecord] = [:]
+    public internal(set) var records: [String: PracticeRecord] = [:]
 
     public init() {}
 

@@ -9,7 +9,12 @@ struct TranscriptView: View {
             if transcript.lines.isEmpty {
                 placeholder("Nenhuma fala encontrada neste arquivo.")
             } else {
-                lines(transcript)
+                VStack(spacing: 0) {
+                    if model.showSearch || model.subtitleSource != nil || model.hideSubtitles {
+                        TranscriptHeader()
+                    }
+                    lines(transcript)
+                }
             }
         } else {
             placeholder("A legenda aparece aqui assim que a transcrição terminar.\nVocê já pode assistir enquanto isso.")
@@ -32,11 +37,13 @@ struct TranscriptView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
+                    let matches = Set(model.searchMatches)
                     ForEach(transcript.lines) { line in
                         LineRow(
                             line: line,
                             isActive: line.id == model.activeLine,
-                            activeWord: line.id == model.activeLine ? model.activeWord : nil
+                            activeWord: line.id == model.activeLine ? model.activeWord : nil,
+                            searchMatch: matches.contains(line.id) ? (line.id == model.currentSearchLine ? .current : .other) : nil
                         )
                         .id(line.id)
                     }
@@ -77,8 +84,14 @@ private struct LineRow: View {
     let line: TranscriptLine
     let isActive: Bool
     let activeWord: Int?
+    var searchMatch: SearchMatch?
+
+    enum SearchMatch { case current, other }
 
     @ViewState private var isHovered = false
+
+    /// Listening challenge: hidden until clicked.
+    private var isHidden: Bool { model.hideSubtitles && !model.revealedLines.contains(line.id) }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 14) {
@@ -116,11 +129,24 @@ private struct LineRow: View {
                             line: line,
                             isLineActive: isActive,
                             isSpoken: isActive && (activeWord.map { index <= $0 } ?? false),
-                            isCurrent: isActive && activeWord == index
+                            isCurrent: isActive && activeWord == index,
+                            isSentenceStart: index == 0 || line.words[index - 1].text.last.map { ".?!".contains($0) } == true
                         )
                     }
                 }
-                if translator.showLineTranslations {
+                .blur(radius: isHidden ? 7 : 0)
+                .allowsHitTesting(!isHidden)
+                .overlay {
+                    if isHidden {
+                        Text(isActive ? "Ouça… e clique para conferir" : "Clique para ver")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(isHovered || isActive ? 0.85 : 0))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                            .onTapGesture { model.revealedLines.insert(line.id) }
+                    }
+                }
+                if translator.showLineTranslations, !isHidden {
                     TranslatedText(text: line.text)
                         .font(.system(size: isActive ? 16 : 14))
                         .italic()
@@ -141,6 +167,12 @@ private struct LineRow: View {
         .overlay(alignment: .leading) {
             if isActive {
                 Capsule().fill(Theme.warm).frame(width: 3).padding(.vertical, 12)
+            }
+        }
+        .overlay {
+            if let searchMatch {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Theme.orange.opacity(searchMatch == .current ? 0.9 : 0.35), lineWidth: searchMatch == .current ? 2 : 1)
             }
         }
         .padding(.horizontal, 10)
@@ -166,10 +198,13 @@ private struct WordButton: View {
     let isLineActive: Bool
     let isSpoken: Bool
     let isCurrent: Bool
+    var isSentenceStart = false
 
     var body: some View {
+        let saved = savedWords.contains(word.text)
+        let uncommon = !saved && model.highlightUncommon && CommonWords.isUncommon(word.text, atSentenceStart: isSentenceStart)
         Text(word.text)
-            .underline(savedWords.contains(word.text), color: Theme.orange)
+            .underline(saved || uncommon, pattern: saved ? .solid : .dot, color: saved ? Theme.orange : Theme.violet)
             .font(.system(size: isLineActive ? 22 : 16, weight: isLineActive ? .bold : .regular))
             .foregroundStyle(color)
             .padding(.horizontal, isCurrent ? 6 : 2)
@@ -290,5 +325,59 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
 
     final class Coordinator {
         var monitor: Any?
+    }
+}
+
+/// Above the subtitles: where they came from, the listening challenge and the search box.
+private struct TranscriptHeader: View {
+    @EnvironmentObject private var model: AppModel
+    @FocusState private var searchFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if model.showSearch {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.textDim)
+                    TextField("Buscar na legenda", text: $model.searchQuery)
+                        .textFieldStyle(.plain)
+                        .focused($searchFocused)
+                        .onSubmit { model.showSearchResult(1) }
+                        .onExitCommand { close() }
+                    if !model.searchQuery.isEmpty {
+                        let count = model.searchMatches.count
+                        Text(count == 0 ? "nada" : "\(model.searchIndex + 1) de \(count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(count == 0 ? Theme.orange : Theme.textDim)
+                        Button { model.showSearchResult(-1) } label: { Image(systemName: "chevron.up") }
+                            .buttonStyle(.plain).disabled(count == 0)
+                        Button { model.showSearchResult(1) } label: { Image(systemName: "chevron.down") }
+                            .buttonStyle(.plain).disabled(count == 0)
+                    }
+                    Button { close() } label: { Image(systemName: "xmark.circle.fill") }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Theme.textDim)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .glassCard(cornerRadius: 10)
+                .frame(maxWidth: 380)
+                .onAppear { searchFocused = true }
+            }
+            Spacer(minLength: 0)
+            if model.hideSubtitles {
+                Chip(text: "Desafio de escuta: clique numa fala para ver", systemImage: "eye.slash.fill", color: Theme.orange)
+            }
+            if let source = model.subtitleSource {
+                Chip(text: source, systemImage: "captions.bubble.fill", color: Theme.violet)
+                    .help("Estas legendas vieram junto com o vídeo. Para usar a transcrição automática, clique em Transcrever de novo.")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+    }
+
+    private func close() {
+        model.searchQuery = ""
+        model.showSearch = false
     }
 }

@@ -1,0 +1,48 @@
+{
+  "app": "english-with-movies",
+  "version": 1,
+  "words": [
+    {
+      "word": "harbor",
+      "phonetic": "/ˈhɑːrbər/",
+      "partOfSpeech": "noun",
+      "definition": "a place on the coast where ships may moor in shelter",
+      "translation": "porto",
+      "context": "We need to leave the harbor before sunset.",
+      "sourcePath": "C:\\Users\\ana\\Videos\\English with Movies\\Storm Scene.mp4",
+      "sourceTime": 4.2,
+      "added": "2026-10-10T12:00:00.000Z",
+      "review": {
+        "interval": 3,
+        "ease": 2.5,
+        "repetitions": 2,
+        "lapses": 0,
+        "due": "2026-10-14T12:00:00.000Z",
+        "lastReviewed": "2026-10-11T12:00:00.000Z"
+      }
+    },
+    {
+      "word": "journey",
+      "translation": "viagem",
+      "added": "2026-10-11T08:30:00.000Z"
+    }
+  ],
+  "deletedWords": {
+    "storm": "2026-10-11T09:00:00.000Z"
+  },
+  "practice": [
+    {
+      "sentence": "We need to leave the harbor before sunset.",
+      "source": "Storm Scene",
+      "lineStart": 4.2,
+      "attempts": [
+        { "date": "2026-10-11T10:00:00.000Z", "score": 72, "recognizedText": "we need to leave the harbor before sunset" }
+      ]
+    }
+  ],
+  "study": {
+    "devices": {
+      "phone-1234": { "2026-10-11": 720 }
+    }
+  }
+}

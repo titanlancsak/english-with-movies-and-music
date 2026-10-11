@@ -57,11 +57,18 @@ final class MediaTools: @unchecked Sendable {
         ] + video + ["-c:a", "aac", "-movflags", "+faststart", output.path])
     }
 
-    /// Saves one video frame as a JPEG (used for library covers).
+    /// Saves one video frame as a JPEG (used for library covers), without black bars.
     func extractFrame(from media: URL, at seconds: Double, to output: URL) async throws {
+        let start = String(format: "%.1f", seconds)
+        // A few frames through cropdetect to find letterbox bars (films in cinema format).
+        let detection = OutputBuffer()
+        try? await run("ffmpeg", [
+            "-hide_banner", "-ss", start, "-i", media.path, "-frames:v", "8", "-vf", "cropdetect=24:2:0", "-f", "null", "-",
+        ]) { detection.append($0 + "\n") }
+        let crop = CropDetect.crop(fromFFmpegOutput: detection.text).map { $0 + "," } ?? ""
         try await run("ffmpeg", [
-            "-y", "-loglevel", "error", "-ss", String(format: "%.1f", seconds), "-i", media.path,
-            "-frames:v", "1", "-vf", "scale=1280:-2", "-q:v", "4", output.path,
+            "-y", "-loglevel", "error", "-ss", start, "-i", media.path,
+            "-frames:v", "1", "-vf", crop + "scale=1280:-2", "-q:v", "4", output.path,
         ])
     }
 
@@ -74,6 +81,8 @@ final class MediaTools: @unchecked Sendable {
             // Prefer H.264 + AAC (plays natively on every Mac), up to 1080p.
             "-S", "res:1080,vcodec:h264,acodec:aac",
             "--merge-output-format", "mp4",
+            // Subtitles written by people (not the automatic ones), in English: used instead of transcribing.
+            "--write-subs", "--sub-langs", "en.*,en", "--convert-subs", "srt",
             "--ffmpeg-location", Self.locate("ffmpeg")?.path ?? "ffmpeg",
             "-o", folder.appendingPathComponent("%(title).120B [%(id)s].%(ext)s").path,
             "--print", "after_move:FILE:%(filepath)s",

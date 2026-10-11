@@ -9,7 +9,12 @@ struct PracticeView: View {
     @EnvironmentObject private var phonemes: PhonemeEngine
     @Environment(\.dismiss) private var dismiss
     @StateObject private var recorder = VoiceRecorder()
-    let line: TranscriptLine
+    /// Changes in shadowing mode, when the user goes to the next line.
+    @ViewState private var line: TranscriptLine
+
+    init(line: TranscriptLine) {
+        _line = ViewState(initialValue: line)
+    }
 
     enum Phase: Equatable {
         case idle
@@ -17,6 +22,10 @@ struct PracticeView: View {
         case analyzing
         case result(PronunciationResult)
         case failed(String)
+
+        var isResult: Bool {
+            if case .result = self { true } else { false }
+        }
     }
 
     @ViewState private var phase: Phase = .idle
@@ -27,8 +36,8 @@ struct PracticeView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
-                    SectionLabel(text: "Treino de pronúncia")
-                    Text("Pratique a fala")
+                    SectionLabel(text: model.shadowing ? "Shadowing · ouça, repita, siga" : "Treino de pronúncia")
+                    Text(model.shadowing ? "Repita depois do personagem" : "Pratique a fala")
                         .font(.system(size: 26, weight: .heavy))
                         .gradientForeground()
                 }
@@ -67,16 +76,25 @@ struct PracticeView: View {
 
             HStack {
                 Spacer()
-                Button("Fechar") { dismiss() }
+                Button(model.shadowing ? "Parar shadowing" : "Fechar") { dismiss() }
                     .buttonStyle(GlassButtonStyle())
                     .keyboardShortcut(.cancelAction)
+                if model.shadowing, case .result = phase, let next = model.line(after: line) {
+                    Button("Próxima fala", systemImage: "forward.fill") { go(to: next) }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .keyboardShortcut(.defaultAction)
+                }
             }
         }
         .padding(24)
         .frame(width: 600)
         .background(AuroraBackground())
         .environment(\.colorScheme, .dark)
-        .onDisappear(perform: cleanUp)
+        .onAppear(perform: startShadowingTurn)
+        .onDisappear {
+            cleanUp()
+            model.shadowing = false
+        }
     }
 
     private var controls: some View {
@@ -130,6 +148,22 @@ struct PracticeView: View {
         }
     }
 
+    /// Shadowing: play the line, then record right away.
+    private func startShadowingTurn() {
+        guard model.shadowing, phase == .idle || phase.isResult else { return }
+        model.playSegment(line) {
+            Task { await startRecording() }
+        }
+    }
+
+    private func go(to next: TranscriptLine) {
+        playback?.stop()
+        deleteRecording()
+        phase = .idle
+        line = next
+        startShadowingTurn()
+    }
+
     private func startRecording() async {
         guard await VoiceRecorder.requestPermission() else {
             phase = .failed("Permita o acesso ao microfone em Ajustes do Sistema › Privacidade e Segurança › Microfone.")
@@ -158,6 +192,7 @@ struct PracticeView: View {
         do {
             let result = try await model.assess(recording: url, line: line, phonemes: phonemes)
             practice.add(result, for: line, source: model.sourceName)
+            model.study.add(StudyLog.secondsPerPractice)
             phase = .result(result)
         } catch {
             phase = .failed(error.localizedDescription)

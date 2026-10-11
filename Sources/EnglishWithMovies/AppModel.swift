@@ -36,7 +36,41 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(model.rawValue, forKey: "whisperModel") }
     }
 
+    // MARK: Study tools
+
+    /// Playback speed (0.5 to 1.25), kept between films.
+    @Published var speed = Float(UserDefaults.standard.object(forKey: "speed") as? Double ?? 1) {
+        didSet {
+            UserDefaults.standard.set(Double(speed), forKey: "speed")
+            applySpeed()
+        }
+    }
+    /// Plays the current line again and again.
+    @Published var loopLine = false {
+        didSet { loopIndex = loopLine ? activeLine : nil }
+    }
+    private var loopIndex: Int?
+    /// Listening challenge: the subtitles stay hidden until a line is clicked.
+    @Published var hideSubtitles = false {
+        didSet { revealedLines = [] }
+    }
+    @Published var revealedLines: Set<Int> = []
+    /// Underlines words outside the 5,000 most common ones.
+    @Published var highlightUncommon = UserDefaults.standard.object(forKey: "highlightUncommon") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(highlightUncommon, forKey: "highlightUncommon") }
+    }
+    /// Shadowing: listen to a line, repeat it, get the score, go to the next one.
+    @Published var shadowing = false
+    @Published var showSearch = false
+    @Published var searchQuery = "" {
+        didSet { searchIndex = 0 }
+    }
+    @Published private(set) var searchIndex = 0
+    /// Where the subtitles came from when they were not transcribed, e.g. "Legenda do YouTube".
+    @Published private(set) var subtitleSource: String?
+
     let library = LibraryStore()
+    let study = StudyStore()
     private var positionObserver: Any?
 
     let dictionary = DictionaryService(offlineLookup: { word in
@@ -52,6 +86,7 @@ final class AppModel: ObservableObject {
     private var pendingSeek: Double?
     /// Pauses playback at the end of a line played with `playSegment`.
     private var segmentObserver: Any?
+    private var segmentCompletion: (() -> Void)?
 
     /// Name of the open movie or song, used to group practice history.
     var sourceName: String? { mediaURL?.deletingPathExtension().lastPathComponent }
@@ -80,6 +115,10 @@ final class AppModel: ObservableObject {
         cancel()
         tearDownPlayer()
         mediaURL = url
+        subtitleSource = nil
+        revealedLines = []
+        loopLine = false
+        searchQuery = ""
         library.recordOpened(url)
         transcript = nil
         job = Task { await load(url, transcribe: true) }
@@ -117,7 +156,20 @@ final class AppModel: ObservableObject {
         transcript = SRTParser.parse(contents)
         status = mediaURL == nil ? .idle : .ready
         if let mediaURL {
-            TranscriptCache.save(transcript!, key: TranscriptCache.key(for: mediaURL, model: model.rawValue))
+            let key = TranscriptCache.key(for: mediaURL, model: model.rawValue)
+            TranscriptCache.save(transcript!, key: key)
+            setSubtitleSource("Legenda importada (.srt)", key: key)
+        }
+    }
+
+    /// Remembers (next to the cached transcript) that it came from a subtitle file, not from Whisper.
+    private func setSubtitleSource(_ source: String?, key: String) {
+        subtitleSource = source
+        let marker = AppFolders.transcripts.appendingPathComponent(key + ".source")
+        if let source {
+            try? source.write(to: marker, atomically: true, encoding: .utf8)
+        } else {
+            try? FileManager.default.removeItem(at: marker)
         }
     }
 
@@ -224,9 +276,25 @@ final class AppModel: ObservableObject {
         let key = TranscriptCache.key(for: url, model: model.rawValue)
         if !skipCache, let cached = TranscriptCache.load(key: key) {
             transcript = cached
+            subtitleSource = try? String(contentsOf: AppFolders.transcripts.appendingPathComponent(key + ".source"), encoding: .utf8)
             status = .ready
             return
         }
+        // Subtitles that came with the video (YouTube, or a .srt next to the film) are ready at once
+        // and usually more accurate than a transcription. "Transcrever de novo" uses Whisper instead.
+        if !skipCache, let srt = MediaFiles.siblingSubtitles(for: url),
+           let contents = (try? String(contentsOf: srt, encoding: .utf8)) ?? (try? String(contentsOf: srt, encoding: .isoLatin1)) {
+            let parsed = SRTParser.parse(contents)
+            if !parsed.lines.isEmpty {
+                TranscriptCache.save(parsed, key: key)
+                transcript = parsed
+                let fromYouTube = url.deletingLastPathComponent().standardizedFileURL == AppFolders.downloads.standardizedFileURL
+                setSubtitleSource(fromYouTube ? "Legenda do YouTube" : "Legenda do arquivo .srt", key: key)
+                status = .ready
+                return
+            }
+        }
+        setSubtitleSource(nil, key: key)
 
         let tools = MediaTools()
         self.tools = tools
@@ -294,22 +362,64 @@ final class AppModel: ObservableObject {
     }
 
     /// Plays only this line, then pauses.
-    func playSegment(_ line: TranscriptLine) {
+    /// `completion` runs when the line has finished playing (not when it is interrupted).
+    func playSegment(_ line: TranscriptLine, then completion: (() -> Void)? = nil) {
         guard let player else { return }
         stopSegment()
         seek(to: line.start)
         let end = CMTime(seconds: line.end + 0.2, preferredTimescale: 600)
+        segmentCompletion = completion
         segmentObserver = player.addBoundaryTimeObserver(forTimes: [NSValue(time: end)], queue: .main) { [weak self] in
-            MainActor.assumeIsolated { self?.stopSegment() }
+            MainActor.assumeIsolated {
+                let completion = self?.segmentCompletion
+                self?.stopSegment()
+                completion?()
+            }
         }
         player.play()
     }
 
     func stopSegment() {
+        segmentCompletion = nil
         guard let segmentObserver else { return }
         player?.pause()
         player?.removeTimeObserver(segmentObserver)
         self.segmentObserver = nil
+    }
+
+    // MARK: - Shadowing and search
+
+    /// Starts shadowing from the current line: listen, repeat, score, next line.
+    func startShadowing() {
+        guard transcript != nil else { return }
+        loopLine = false
+        shadowing = true
+        practiceCurrentLine()
+    }
+
+    func line(after line: TranscriptLine) -> TranscriptLine? {
+        transcript?.lines.first { $0.start > line.start + 0.01 }
+    }
+
+    var searchMatches: [Int] { transcript?.lineIndices(matching: searchQuery) ?? [] }
+
+    /// Goes to the next (1) or previous (-1) line containing the search text.
+    func showSearchResult(_ step: Int) {
+        let matches = searchMatches
+        guard !matches.isEmpty, let transcript else { return }
+        searchIndex = ((searchIndex + step) % matches.count + matches.count) % matches.count
+        seek(to: transcript.lines[matches[searchIndex]].start)
+    }
+
+    var currentSearchLine: Int? {
+        let matches = searchMatches
+        return matches.isEmpty ? nil : matches[min(searchIndex, matches.count - 1)]
+    }
+
+    private func applySpeed() {
+        guard let player else { return }
+        player.defaultRate = speed
+        if player.timeControlStatus == .playing { player.rate = speed }
     }
 
     /// Transcribes a recording of the user and scores it against the line.
@@ -353,6 +463,9 @@ final class AppModel: ObservableObject {
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             MainActor.assumeIsolated { self?.updateActive(time.seconds) }
         }
+        // Slower speeds keep the voice's pitch.
+        player.currentItem?.audioTimePitchAlgorithm = .spectral
+        player.defaultRate = speed
         // `--preview` (for screenshots): open silent and paused.
         if Self.isPreview {
             player.isMuted = true
@@ -386,13 +499,29 @@ final class AppModel: ObservableObject {
 
     /// Only publishes when the highlighted line/word actually changes, to keep the UI light.
     private func updateActive(_ time: Double) {
-        guard let transcript else { return }
+        // Study time for the daily goal: real seconds of playback.
+        if let last = lastObservedTime, player?.timeControlStatus == .playing, time > last, time - last < 1 {
+            study.add((time - last) / Double(max(speed, 0.1)))
+        }
+        guard let transcript else {
+            lastObservedTime = time
+            return
+        }
         // A jump: the slider, the skip buttons, a click on a line... anything but normal playback
         // (the observer runs every 0.05 s, so normal playback moves far less than a second).
         if let last = lastObservedTime, abs(time - last) > 1 {
             jumpSubtitles(to: time)
+            if loopLine { loopIndex = transcript.lineIndex(at: time) }
         }
         lastObservedTime = time
+        // Repeat the line: back to its start once it ends.
+        if loopLine, segmentObserver == nil {
+            if loopIndex == nil { loopIndex = transcript.lineIndex(at: time) }
+            if let index = loopIndex, time > transcript.lines[index].end + 0.3 {
+                seek(to: transcript.lines[index].start)
+                return
+            }
+        }
         let line = transcript.lineIndex(at: time)
         let word = line.flatMap { transcript.lines[$0].wordIndex(at: time) }
         if line != activeLine { activeLine = line }

@@ -78,6 +78,7 @@ struct ReviewView: View {
     private func answer(_ grade: ReviewGrade) {
         guard let key = queue.first else { return }
         store.grade(key, grade)
+        model.study.add(StudyLog.secondsPerReview)
         reviewed += 1
         if grade != .again { remembered += 1 }
         queue.removeFirst()

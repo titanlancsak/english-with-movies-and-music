@@ -4,11 +4,22 @@ import SwiftUI
 @main
 struct EnglishWithMoviesApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    @StateObject private var model = AppModel()
-    @StateObject private var savedWords = SavedWordsStore()
+    @StateObject private var model: AppModel
+    @StateObject private var savedWords: SavedWordsStore
     @StateObject private var translator = Translator()
-    @StateObject private var practice = PracticeStore()
+    @StateObject private var practice: PracticeStore
     @StateObject private var phonemes = PhonemeEngine()
+    @StateObject private var sync: SyncService
+    @StateObject private var updates = UpdateChecker()
+
+    init() {
+        // The sync service works with the stores, so they are created together.
+        let model = AppModel(), savedWords = SavedWordsStore(), practice = PracticeStore()
+        _model = StateObject(wrappedValue: model)
+        _savedWords = StateObject(wrappedValue: savedWords)
+        _practice = StateObject(wrappedValue: practice)
+        _sync = StateObject(wrappedValue: SyncService(savedWords: savedWords, practice: practice, study: model.study))
+    }
 
     var body: some Scene {
         WindowGroup("English with Movies & Music") {
@@ -19,9 +30,13 @@ struct EnglishWithMoviesApp: App {
                 .environmentObject(translator)
                 .environmentObject(practice)
                 .environmentObject(phonemes)
+                .environmentObject(model.study)
+                .environmentObject(sync)
+                .environmentObject(updates)
                 .modifier(TranslationHost(translator: translator))
                 .frame(minWidth: 960, minHeight: 640)
                 .onAppear { delegate.model = model }
+                .task { await updates.check() }
         }
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -33,6 +48,22 @@ struct EnglishWithMoviesApp: App {
             CommandMenu("Reprodução") {
                 Button("Play / Pause") { model.togglePlay() }
                     .keyboardShortcut("p")
+                Button(model.loopLine ? "Parar de repetir a fala" : "Repetir a fala atual") { model.loopLine.toggle() }
+                    .keyboardShortcut("l")
+                    .disabled(model.transcript == nil)
+                Button("Mais devagar") { model.speed = max(0.5, model.speed - 0.25) }
+                    .keyboardShortcut("[")
+                Button("Mais rápido") { model.speed = min(1.25, model.speed + 0.25) }
+                    .keyboardShortcut("]")
+                Divider()
+                Button("Buscar na legenda") { model.showSearch = true }
+                    .keyboardShortcut("f")
+                    .disabled(model.transcript == nil)
+                Button("Shadowing (ouvir e repetir)") { model.startShadowing() }
+                    .keyboardShortcut("r", modifiers: [.command, .option])
+                    .disabled(model.transcript == nil)
+                Button(model.hideSubtitles ? "Mostrar a legenda" : "Desafio de escuta (esconder a legenda)") { model.hideSubtitles.toggle() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
                 Button("Praticar a fala atual") { model.practiceCurrentLine() }
                     .keyboardShortcut("r")
                     .disabled(model.transcript == nil)
@@ -94,6 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
             model?.savePosition()
+            model?.study.persist()
             MediaFiles.cleanDownloadLeftovers()
         }
     }

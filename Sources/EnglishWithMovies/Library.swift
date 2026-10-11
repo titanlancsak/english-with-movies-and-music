@@ -219,10 +219,36 @@ final class LibraryStore: ObservableObject {
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 1280, height: 720)
         if let (image, _) = try? await generator.image(at: CMTime(seconds: time, preferredTimescale: 600)),
-           let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.8]) {
+           let jpeg = NSBitmapImageRep(cgImage: trimmingLetterbox(image)).representation(using: .jpeg, properties: [.compressionFactor: 0.8]) {
             return ((try? jpeg.write(to: file)) != nil, duration)
         }
         let ok = (try? await MediaTools().extractFrame(from: url, at: time, to: file)) != nil
         return (ok, duration)
+    }
+
+    /// Removes the black bars above and below a film in cinema format.
+    private nonisolated static func trimmingLetterbox(_ image: CGImage) -> CGImage {
+        let width = image.width, height = image.height
+        guard width > 64, height > 64,
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let _ = Optional(context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))),
+              let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else { return image }
+        // A row is black when almost none of its pixels is brighter than a dark gray.
+        func isBlack(_ row: Int) -> Bool {
+            var bright = 0
+            for x in stride(from: 0, to: width, by: 4) {
+                let i = (row * width + x) * 4
+                if max(pixels[i], pixels[i + 1], pixels[i + 2]) > 40 { bright += 1 }
+            }
+            return bright < width / 4 / 50
+        }
+        var top = 0, bottom = height - 1
+        while top < height / 3, isBlack(top) { top += 1 }
+        while bottom > height * 2 / 3, isBlack(bottom) { bottom -= 1 }
+        let kept = bottom - top + 1
+        guard kept < height - height / 25, Double(kept) >= Double(width) * 0.38,
+              let cropped = image.cropping(to: CGRect(x: 0, y: top, width: width, height: kept)) else { return image }
+        return cropped
     }
 }

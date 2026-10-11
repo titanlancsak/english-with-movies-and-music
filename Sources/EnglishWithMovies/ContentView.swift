@@ -24,6 +24,7 @@ struct ContentView: View {
             ZStack {
                 AuroraBackground()
                 VStack(spacing: 0) {
+                    UpdateBanner()
                     StatusBar()
                     detail
                 }
@@ -98,8 +99,9 @@ struct ContentView: View {
     }
 
     /// Used for screenshots, with `--preview`:
-    /// `--section=words|review|practice` opens a screen; with a film open, `--practice` opens the
-    /// practice sheet for the current line and `--word=harbor` shows that word's dictionary card.
+    /// `--section=words|review|practice` opens a screen; `--settings` the settings; with a film open,
+    /// `--practice` opens the practice sheet for the current line, `--word=harbor` that word's
+    /// dictionary card, `--search=text` the search and `--challenge` the listening challenge.
     private func applyPreviewArguments() {
         guard AppModel.isPreview else { return }
         let arguments = CommandLine.arguments
@@ -109,7 +111,15 @@ struct ContentView: View {
         case "practice": model.section = .practice
         default: break
         }
+        if arguments.contains("--challenge") { model.hideSubtitles = true }
         let word = arguments.first { $0.hasPrefix("--word=") }.map { String($0.dropFirst(7)) }
+        if let search = arguments.first(where: { $0.hasPrefix("--search=") })?.dropFirst(9) {
+            model.showSearch = true
+            Task {
+                for _ in 0..<40 where model.transcript == nil { try? await Task.sleep(for: .milliseconds(250)) }
+                model.searchQuery = String(search)
+            }
+        }
         guard word != nil || arguments.contains("--practice") else { return }
         Task {
             for _ in 0..<40 where model.transcript == nil { try? await Task.sleep(for: .milliseconds(250)) }
@@ -168,8 +178,12 @@ private struct Sidebar: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var savedWords: SavedWordsStore
     @EnvironmentObject private var practice: PracticeStore
+    @EnvironmentObject private var study: StudyStore
+    @EnvironmentObject private var sync: SyncService
+    @EnvironmentObject private var updates: UpdateChecker
     @Binding var showLinkSheet: Bool
     @Binding var cleanupSize: Int64?
+    @ViewState private var showSettings = AppModel.isPreview && CommandLine.arguments.contains("--settings")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -212,24 +226,33 @@ private struct Sidebar: View {
         }
     }
 
-    /// Which Whisper model transcribes, plus housekeeping.
+    /// Settings, with the transcription model and the sync state at a glance.
     private var transcriptionCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "Transcrição")
-            Picker("Modelo", selection: $model.model) {
-                ForEach(WhisperModel.allCases) { Text($0.title).tag($0) }
+        Button { showSettings = true } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "gearshape.fill")
+                    .foregroundStyle(Theme.textDim)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Ajustes").font(.system(size: 13, weight: .semibold))
+                    Text(sync.folder == nil ? model.model.title : "Sincronização ligada")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.textDim)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
             }
-            .labelsHidden()
-            .help("Modelo de transcrição: os maiores são mais precisos e mais lentos")
-            Button("Liberar espaço…") { cleanupSize = model.convertedCopiesSize() }
-                .buttonStyle(.plain)
-                .font(.caption)
-                .foregroundStyle(Theme.textDim)
-                .help("Apagar as cópias convertidas de vídeos .mkv, VP9 e AV1")
-                .disabled(model.isBusy)
+            .padding(12)
+            .glassCard(cornerRadius: 12)
+            .contentShape(Rectangle())
         }
-        .padding(12)
-        .glassCard(cornerRadius: 12)
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environmentObject(model)
+                .environmentObject(study)
+                .environmentObject(sync)
+                .environmentObject(updates)
+        }
     }
 }
 
@@ -332,7 +355,7 @@ private struct PlayerScreen: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let videoHeight = min(geometry.size.width * 9 / 16, geometry.size.height * 0.56)
+            let videoHeight = min(geometry.size.width * 9 / 16, geometry.size.height * 0.5)
             VStack(spacing: 14) {
                 PlayerArea()
                     .frame(maxWidth: videoHeight * 16 / 9, maxHeight: videoHeight)
@@ -342,6 +365,7 @@ private struct PlayerScreen: View {
                     )
                     .shadow(color: Theme.indigo.opacity(0.35), radius: 40, y: 10)
                     .frame(maxWidth: .infinity)
+                StudyBar()
                 TranscriptView()
                     .glassCard(cornerRadius: 18)
             }
@@ -349,6 +373,99 @@ private struct PlayerScreen: View {
             .padding(.top, 8)
             .padding(.bottom, 16)
         }
+    }
+}
+
+/// Study tools under the video: repeat the line, speed, shadowing, listening challenge,
+/// uncommon words and search.
+private struct StudyBar: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ToggleChip(title: "Repetir fala", icon: "repeat", isOn: model.loopLine, help: "Repete a fala atual sem parar (⌘L)") {
+                model.loopLine.toggle()
+            }
+            SpeedPicker(speed: $model.speed)
+            ToggleChip(title: "Shadowing", icon: "person.wave.2.fill", isOn: model.shadowing,
+                       help: "Ouve uma fala, você repete, recebe a nota e segue para a próxima (⌥⌘R)") {
+                model.startShadowing()
+            }
+            .disabled(model.transcript == nil)
+            ToggleChip(title: "Desafio de escuta", icon: model.hideSubtitles ? "eye.slash.fill" : "eye.slash", isOn: model.hideSubtitles,
+                       help: "Esconde a legenda: tente entender só ouvindo e clique na fala para conferir (⇧⌘E)") {
+                model.hideSubtitles.toggle()
+            }
+            ToggleChip(title: "Palavras difíceis", icon: "sparkles", isOn: model.highlightUncommon,
+                       help: "Sublinha as palavras fora das 5.000 mais comuns do inglês") {
+                model.highlightUncommon.toggle()
+            }
+            Spacer(minLength: 0)
+            Button { model.showSearch.toggle() } label: { Image(systemName: "magnifyingglass") }
+                .buttonStyle(IconButtonStyle(size: 30, tint: model.showSearch ? Theme.violet : .white))
+                .help("Buscar na legenda (⌘F)")
+                .disabled(model.transcript == nil)
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
+/// A capsule that lights up with the brand gradient when on.
+struct ToggleChip: View {
+    let title: String
+    let icon: String
+    let isOn: Bool
+    var help = ""
+    let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
+    @ViewState private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .foregroundStyle(isOn ? .white : .white.opacity(isEnabled ? 0.8 : 0.35))
+                .background(Capsule().fill(isOn ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(isHovered ? Theme.surfaceHover : Theme.surface)))
+                .overlay(Capsule().strokeBorder(isOn ? Color.clear : Theme.stroke))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(help)
+    }
+}
+
+/// 0.5× 0.75× 1× 1.25×
+private struct SpeedPicker: View {
+    @Binding var speed: Float
+    private static let options: [Float] = [0.5, 0.75, 1, 1.25]
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "gauge.with.dots.needle.50percent")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.textDim)
+                .padding(.leading, 8)
+            ForEach(Self.options, id: \.self) { option in
+                Button { speed = option } label: {
+                    Text(option == 1 ? "1×" : String(format: "%g×", option).replacingOccurrences(of: ".", with: ","))
+                        .font(.system(size: 11.5, weight: .bold).monospacedDigit())
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .foregroundStyle(speed == option ? .white : Theme.textDim)
+                        .background(Capsule().fill(speed == option ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(Color.clear)))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2)
+        .background(Capsule().fill(Theme.surface))
+        .overlay(Capsule().strokeBorder(Theme.stroke))
+        .help("Velocidade (⌘[ e ⌘])")
     }
 }
 
@@ -424,6 +541,27 @@ private struct StatusBar: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
+    }
+}
+
+/// "Nova versão disponível" when GitHub has a newer release.
+private struct UpdateBanner: View {
+    @EnvironmentObject private var updates: UpdateChecker
+
+    var body: some View {
+        if let available = updates.available {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles").foregroundStyle(Theme.violet)
+                Text("Nova versão \(available.version) disponível").font(.callout.weight(.semibold))
+                Spacer()
+                Button("Depois") { updates.dismiss() }.buttonStyle(GlassButtonStyle())
+                Button("Baixar", systemImage: "arrow.down.circle.fill") { updates.download() }.buttonStyle(PrimaryButtonStyle())
+            }
+            .padding(12)
+            .glassCard(cornerRadius: 14)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+        }
     }
 }
 

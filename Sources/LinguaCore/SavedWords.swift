@@ -33,6 +33,9 @@ public struct SavedWord: Codable, Hashable, Identifiable, Sendable {
         self.dateAdded = dateAdded
     }
 
+    /// When the word last changed (saved or reviewed); the newest copy wins when syncing.
+    public var changed: Date { max(dateAdded, review?.lastReviewed ?? .distantPast) }
+
     /// The file name without extension or a trailing video id such as " [R6MlUcmOul8]".
     public var sourceName: String? {
         sourcePath.map {
@@ -45,9 +48,18 @@ public struct SavedWord: Codable, Hashable, Identifiable, Sendable {
 /// The saved words, newest first.
 public struct WordList: Codable, Hashable, Sendable {
     public internal(set) var words: [SavedWord] = []
+    /// Removed words and when, so a sync does not bring them back from another device.
+    public internal(set) var deleted: [String: Date] = [:]
 
     public init(words: [SavedWord] = []) {
         self.words = words
+    }
+
+    // Lists saved before `deleted` existed have no such key.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        words = try container.decode([SavedWord].self, forKey: .words)
+        deleted = try container.decodeIfPresent([String: Date].self, forKey: .deleted) ?? [:]
     }
 
     public var keys: Set<String> { Set(words.map(\.key)) }
@@ -64,13 +76,15 @@ public struct WordList: Codable, Hashable, Sendable {
         if word.review == nil, let existing = words.first(where: { $0.key == word.key }) {
             word.review = existing.review
         }
-        remove(word.key)
+        words.removeAll { $0.key == word.key }
+        deleted.removeValue(forKey: word.key)
         words.insert(word, at: 0)
     }
 
-    public mutating func remove(_ word: String) {
+    public mutating func remove(_ word: String, at date: Date = Date()) {
         let key = WordNormalizer.lookupKey(word)
         words.removeAll { $0.key == key }
+        deleted[key] = date
     }
 
     public func filtered(by query: String) -> [SavedWord] {

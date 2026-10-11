@@ -50,6 +50,15 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.lines = lines
     }
 
+    /// Lines whose text contains the query (ignoring case and accents), in order.
+    public func lineIndices(matching query: String) -> [Int] {
+        let query = query.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return [] }
+        return lines.indices.filter {
+            lines[$0].text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
+    }
+
     /// Index of the line being spoken at `time` (binary search).
     /// Between two lines, the previous line stays active until the next one starts.
     public func lineIndex(at time: Double) -> Int? {
