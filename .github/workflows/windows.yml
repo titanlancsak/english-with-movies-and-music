@@ -96,9 +96,10 @@ jobs:
           for ($i = 0; $i -lt 60 -and -not $done; $i++) {
             Start-Sleep 5
             $logFile = Get-ChildItem $env:APPDATA -Recurse -Filter app.log -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($logFile) { $done = Select-String -Path $logFile.FullName -Pattern "Transcrição pronta|Erro" -Quiet }
+            if ($logFile) { $done = Select-String -Path $logFile.FullName -Pattern "Legenda na tela|Erro" -Quiet }
           }
-          Start-Sleep 4
+          # Give the (software-rendered) window time to draw the subtitles.
+          Start-Sleep 15
           Write-Host "App running: $(-not $app.HasExited)"
           Write-Host "---- app.log ----"
           if ($logFile) { Get-Content $logFile.FullName -Encoding UTF8 }
@@ -116,9 +117,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: EnglishWithMovies-Windows
-          path: |
-            EnglishWithMovies-Windows.zip
-            windows-screenshot.png
+          path: EnglishWithMovies-Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: end-to-end-screenshot
+          path: windows-screenshot.png
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')

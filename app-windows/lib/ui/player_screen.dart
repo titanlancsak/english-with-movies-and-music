@@ -8,6 +8,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../core/transcript.dart';
 import '../core/word_normalizer.dart';
 import '../services/app_controller.dart';
+import '../services/log.dart';
 import 'common.dart';
 import 'practice_dialog.dart';
 import 'word_dialog.dart';
@@ -50,6 +51,7 @@ class TranscriptPanel extends StatefulWidget {
 class _TranscriptPanelState extends State<TranscriptPanel> {
   final _scroll = ItemScrollController();
   StreamSubscription<int>? _jumps;
+  Object? _loggedTranscript;
 
   @override
   void initState() {
@@ -84,6 +86,10 @@ class _TranscriptPanelState extends State<TranscriptPanel> {
     }
     if (transcript.lines.isEmpty) {
       return const Center(child: Text('Nenhuma fala encontrada neste arquivo.', style: TextStyle(color: Colors.white54)));
+    }
+    if (!identical(_loggedTranscript, transcript)) {
+      _loggedTranscript = transcript;
+      log('Legenda na tela: ${transcript.lines.length} falas');
     }
     return Stack(children: [
       NotificationListener<UserScrollNotification>(
